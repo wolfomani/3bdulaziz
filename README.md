@@ -1,30 +1,67 @@
-# drx3apipage2
+# Dr X AI Platform - منصة الدكتور إكس للذكاء الاصطناعي
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+*تم إنشاؤها بواسطة [v0.dev](https://v0.dev) ومتزامنة تلقائياً*
 
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/balqees0alalawi-gmailcoms-projects/v0-drx3apipage2)
 [![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/VtjioudvZUK)
 
-## Overview
+## نظرة عامة
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+منصة الدكتور إكس للذكاء الاصطناعي - منصة متقدمة لتعلم الآلة والذكاء الاصطناعي مع دعم كامل للغة العربية.
 
-## Deployment
+## الميزات الرئيسية
 
-Your project is live at:
+- 🤖 **واجهة محادثة ذكية** - تفاعل مع نماذج الذكاء الاصطناعي المتقدمة
+- 📊 **لوحة تحكم ML** - مراقبة وإدارة نماذج تعلم الآلة
+- 📝 **مدونة تقنية** - مقالات متخصصة في الذكاء الاصطناعي
+- 🎨 **تصميم متجاوب** - يعمل على جميع الأجهزة
+- 🌙 **الوضع المظلم** - تجربة مستخدم محسنة
+- 🔥 **تأثيرات بصرية** - رسوم متحركة وتأثيرات جذابة
 
-**[https://vercel.com/balqees0alalawi-gmailcoms-projects/v0-drx3apipage2](https://vercel.com/balqees0alalawi-gmailcoms-projects/v0-drx3apipage2)**
+## التقنيات المستخدمة
 
-## Build your app
+- **Frontend**: Next.js 14, React 18, TypeScript
+- **Styling**: Tailwind CSS, Framer Motion
+- **UI Components**: Radix UI, shadcn/ui
+- **AI Integration**: AI SDK, Groq
+- **Database**: Neon PostgreSQL
+- **Caching**: Upstash Redis
+- **Deployment**: Vercel
 
-Continue building your app on:
+## المتعاونون
 
-**[https://v0.dev/chat/projects/VtjioudvZUK](https://v0.dev/chat/projects/VtjioudvZUK)**
+- **3bdulaziz** - المطور الرئيسي
 
-## How It Works
+## الرابط المباشر
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+**[https://v0-drx3apipage2.vercel.app](https://v0-drx3apipage2.vercel.app)**
+
+## التطوير المحلي
+
+\`\`\`bash
+# تثبيت التبعيات
+npm install
+
+# تشغيل الخادم المحلي
+npm run dev
+
+# بناء المشروع
+npm run build
+\`\`\`
+
+## البنية
+
+\`\`\`
+drx3apipage2/
+├── app/                 # صفحات Next.js
+├── components/          # مكونات React
+├── lib/                # مكتبات مساعدة
+├── hooks/              # React Hooks
+├── utils/              # دوال مساعدة
+├── styles/             # ملفات CSS
+└── public/             # الملفات العامة
+\`\`\`
+
+## الترخيص
+
+هذا المشروع محمي بحقوق الطبع والنشر © 2024 Dr X AI Platform
