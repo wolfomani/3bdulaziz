@@ -23,6 +23,7 @@ export class WebhookHandler {
             "Content-Type": "application/json",
             "X-Webhook-Timestamp": Date.now().toString(),
             "X-Webhook-Signature": this.generateSignature(payload),
+            "User-Agent": "DrX3-Webhook-Handler/1.0",
             ...headers,
           },
           body: JSON.stringify(payload),
@@ -30,10 +31,11 @@ export class WebhookHandler {
         })
 
         if (response.ok) {
+          console.log(`Webhook sent successfully to ${this.config.url}`)
           return true
         }
 
-        console.warn(`Webhook attempt ${attempts + 1} failed:`, response.status)
+        console.warn(`Webhook attempt ${attempts + 1} failed:`, response.status, response.statusText)
       } catch (error) {
         console.error(`Webhook attempt ${attempts + 1} error:`, error)
       }
@@ -45,6 +47,7 @@ export class WebhookHandler {
       }
     }
 
+    console.error(`Failed to send webhook after ${this.config.retryAttempts} attempts`)
     return false
   }
 
@@ -52,7 +55,10 @@ export class WebhookHandler {
     if (!this.config.secret) return "no-signature"
 
     // In a real implementation, use HMAC-SHA256
-    return `sha256=${Buffer.from(JSON.stringify(payload) + this.config.secret).toString("base64")}`
+    const crypto = require("crypto")
+    const hmac = crypto.createHmac("sha256", this.config.secret)
+    hmac.update(JSON.stringify(payload))
+    return `sha256=${hmac.digest("hex")}`
   }
 
   private delay(ms: number): Promise<void> {
@@ -72,4 +78,48 @@ export const webhookConfigs = {
     retryAttempts: 2,
     timeout: 5000,
   },
+  vercel: {
+    url: "https://3bdulaziz.vercel.app/api/webhooks",
+    retryAttempts: 3,
+    timeout: 8000,
+  },
 }
+
+export interface WebhookEvent {
+  id: string
+  type: string
+  timestamp: string
+  source: string
+  data: any
+  metadata?: {
+    userAgent?: string
+    ip?: string
+    headers?: Record<string, string>
+  }
+}
+
+export class WebhookEventLogger {
+  private events: WebhookEvent[] = []
+  private maxEvents = 1000
+
+  log(event: WebhookEvent): void {
+    this.events.unshift(event)
+    if (this.events.length > this.maxEvents) {
+      this.events = this.events.slice(0, this.maxEvents)
+    }
+  }
+
+  getEvents(limit?: number): WebhookEvent[] {
+    return limit ? this.events.slice(0, limit) : this.events
+  }
+
+  getEventsByType(type: string): WebhookEvent[] {
+    return this.events.filter((event) => event.type === type)
+  }
+
+  clear(): void {
+    this.events = []
+  }
+}
+
+export const globalWebhookLogger = new WebhookEventLogger()
