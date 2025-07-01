@@ -8,17 +8,16 @@ import {
   Github,
   Mail,
   ArrowDown,
-  Zap,
   Brain,
-  Shield,
   Rocket,
   MessageSquare,
-  BarChart3,
   Users,
   Star,
-  CheckCircle,
-  Play,
-  ArrowRight,
+  Code,
+  Database,
+  Cpu,
+  Globe,
+  BookOpen,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 
@@ -37,6 +36,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
+      {/* Skip to content for accessibility */}
+      <a href="#main-content" className="skip-to-content">
+        انتقل إلى المحتوى الرئيسي
+      </a>
+
       {/* Animated Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-br from-black via-red-950/20 to-black" />
@@ -66,25 +70,27 @@ export default function HomePage() {
       >
         <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl relative">
           <nav className="flex items-center justify-between gap-4">
-            <Link href="/" aria-label="drx3 Homepage" className="z-50">
-              <div className="text-2xl font-bold gradient-text hover:scale-105 transition-transform">drx3</div>
+            <Link href="/" aria-label="عبد العزيز الحمداني - الصفحة الرئيسية" className="z-50">
+              <div className="text-2xl font-bold gradient-text hover:scale-105 transition-transform">
+                عبد العزيز الحمداني
+              </div>
             </Link>
 
             <ul className="ml-3 hidden flex-grow gap-6 lg:flex">
               <li>
                 <Link
                   className="text-red-400 font-medium px-3 py-2 text-sm hover:text-red-300 hover:bg-white/5 rounded-lg transition-all duration-200"
-                  href="#features"
+                  href="#skills"
                 >
-                  المميزات
+                  المهارات
                 </Link>
               </li>
               <li>
                 <Link
                   className="text-white/70 font-medium px-3 py-2 text-sm hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200"
-                  href="#services"
+                  href="#projects"
                 >
-                  الخدمات
+                  المشاريع
                 </Link>
               </li>
               <li>
@@ -92,7 +98,7 @@ export default function HomePage() {
                   className="text-white/70 font-medium px-3 py-2 text-sm hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200"
                   href="#about"
                 >
-                  من نحن
+                  من أنا
                 </Link>
               </li>
               <li>
@@ -100,7 +106,7 @@ export default function HomePage() {
                   className="text-white/70 font-medium px-3 py-2 text-sm hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200"
                   href="#contact"
                 >
-                  تواصل
+                  تواصل معي
                 </Link>
               </li>
             </ul>
@@ -116,13 +122,13 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section - محسن */}
-      <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
+      {/* Hero Section - محسن مع الصورة الشخصية */}
+      <section id="main-content" className="relative h-screen w-full flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0" style={{ transform: `translateY(${scrollY * 0.5}px)` }}>
           <div className="absolute -inset-x-0 bottom-28 lg:bottom-12 flex justify-center">
             <div className="max-w-7xl w-full flex justify-center items-center">
-              <div className="opacity-5 lg:opacity-10 select-none text-[20rem] lg:text-[25rem] font-bold tracking-wider text-white/20 animate-pulse">
-                drx3
+              <div className="opacity-5 lg:opacity-10 select-none text-[15rem] lg:text-[20rem] font-bold tracking-wider text-white/20 animate-pulse">
+                عبد العزيز
               </div>
             </div>
           </div>
@@ -130,51 +136,94 @@ export default function HomePage() {
 
         <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl flex h-full flex-col relative z-10">
           <div className="flex items-center justify-center h-full mt-20">
-            <div className="text-center space-y-8 animate-fade-in-up max-w-4xl">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-white/80 border border-white/20 mb-6">
-                <Star className="w-4 h-4 text-yellow-400" />
-                <span>منصة الذكاء الاصطناعي الأولى عربياً</span>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-6xl w-full">
+              {/* النص والمحتوى */}
+              <div className="text-center lg:text-right space-y-8 animate-fade-in-up">
+                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-white/80 border border-white/20 mb-6">
+                  <Star className="w-4 h-4 text-yellow-400" />
+                  <span>مهندس برمجيات من سلطنة عُمان</span>
+                </div>
 
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-                <span className="gradient-text animate-float">قوة الذكاء الاصطناعي</span>
-                <br />
-                <span className="text-white">في متناول يدك</span>
-              </h1>
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
+                  <span className="gradient-text animate-float">عبد العزيز الحمداني</span>
+                  <br />
+                  <span className="text-white text-2xl md:text-3xl lg:text-4xl">خبير الذكاء الاصطناعي</span>
+                </h1>
 
-              <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed animate-slide-in-right">
-                منصة drx3 تقدم لك أحدث تقنيات الذكاء الاصطناعي بواجهة سهلة الاستخدام وإمكانيات لا محدودة
-              </p>
+                <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed animate-slide-in-right">
+                  مهندس برمجيات متخصص في Python والذكاء الاصطناعي، أطور حلول RAG المتقدمة وأعمل مع Groq API لإنشاء
+                  تطبيقات ذكية عالية الأداء
+                </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-in-left pt-4">
-                <Link href="/chat">
-                  <Button className="bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600 transition-all duration-300 rounded-full px-8 py-4 text-lg font-medium shadow-xl hover:shadow-red-500/30 hover:scale-105 group">
-                    <MessageSquare className="w-5 h-5 ml-2 group-hover:rotate-12 transition-transform" />
-                    ابدأ الآن مجاناً
+                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-slide-in-left pt-4">
+                  <Link href="/chat">
+                    <Button className="bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600 transition-all duration-300 rounded-full px-8 py-4 text-lg font-medium shadow-xl hover:shadow-red-500/30 hover:scale-105 group">
+                      <MessageSquare className="w-5 h-5 ml-2 group-hover:rotate-12 transition-transform" />
+                      تحدث معي
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-full px-8 py-4 text-lg font-medium bg-transparent backdrop-blur-sm group"
+                    asChild
+                  >
+                    <Link href="#projects">
+                      <Code className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
+                      شاهد أعمالي
+                    </Link>
                   </Button>
-                </Link>
-                <Button
-                  variant="outline"
-                  className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-full px-8 py-4 text-lg font-medium bg-transparent backdrop-blur-sm group"
-                >
-                  <Play className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
-                  شاهد العرض التوضيحي
-                </Button>
+                </div>
+
+                {/* روابط التواصل */}
+                <div className="flex gap-4 justify-center lg:justify-start pt-6">
+                  <Link
+                    href="https://github.com/wolfomani"
+                    className="bg-white/10 backdrop-blur-sm rounded-full p-3 hover:bg-white/20 transition-all duration-300 group"
+                    aria-label="GitHub Profile"
+                  >
+                    <Github className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  </Link>
+                  <Link
+                    href="https://t.me/wolfaiOM"
+                    className="bg-white/10 backdrop-blur-sm rounded-full p-3 hover:bg-white/20 transition-all duration-300 group"
+                    aria-label="Telegram"
+                  >
+                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  </Link>
+                  <Link
+                    href="mailto:openaziz00@gmail.com"
+                    className="bg-white/10 backdrop-blur-sm rounded-full p-3 hover:bg-white/20 transition-all duration-300 group"
+                    aria-label="Email"
+                  >
+                    <Mail className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  </Link>
+                </div>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-8 pt-12 max-w-2xl mx-auto">
-                <div className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold text-red-400">10K+</div>
-                  <div className="text-sm text-gray-400">مستخدم نشط</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold text-red-400">99.9%</div>
-                  <div className="text-sm text-gray-400">وقت التشغيل</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold text-red-400">24/7</div>
-                  <div className="text-sm text-gray-400">دعم فني</div>
+              {/* الصورة الشخصية */}
+              <div className="flex justify-center lg:justify-end">
+                <div className="relative group">
+                  <div className="absolute -inset-4 bg-gradient-to-r from-red-600 to-orange-500 rounded-full blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
+                  <div className="relative">
+                    <img
+                      src="/images/profile-photo.jpg"
+                      alt="عبد العزيز الحمداني - مهندس برمجيات متخصص في الذكاء الاصطناعي"
+                      className="w-80 h-80 md:w-96 md:h-96 rounded-full object-cover border-4 border-white/20 shadow-2xl group-hover:scale-105 transition-all duration-300 profile-image"
+                      loading="eager"
+                    />
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent"></div>
+
+                    {/* شارة الحالة */}
+                    <div className="absolute bottom-8 right-8 bg-green-500 w-6 h-6 rounded-full border-4 border-white shadow-lg animate-pulse"></div>
+
+                    {/* معلومات إضافية */}
+                    <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+                      <div className="text-center">
+                        <div className="text-sm font-medium text-white">متاح للعمل</div>
+                        <div className="text-xs text-gray-300">سلطنة عُمان</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -186,97 +235,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Services Section - جديد */}
-      <section id="services" className="py-20 relative z-10">
+      {/* Skills Section - جديد */}
+      <section id="skills" className="py-20 relative z-10">
         <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-gray-400 mb-6 border border-white/10">
-              <span>الخدمات</span>
+              <Code className="w-4 h-4" />
+              <span>المهارات التقنية</span>
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">حلول ذكية لكل احتياجاتك</h2>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">خبراتي التقنية</h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              نقدم مجموعة شاملة من خدمات الذكاء الاصطناعي المصممة لتلبية احتياجاتك
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
-              <CardContent className="p-6">
-                <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <MessageSquare className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-3 text-white">المحادثة الذكية</h3>
-                <p className="text-gray-400 mb-4">
-                  تفاعل مع نماذج الذكاء الاصطناعي المتقدمة للحصول على إجابات دقيقة وسريعة
-                </p>
-                <ul className="space-y-2 text-sm text-gray-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    دعم اللغة العربية الكامل
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    استجابة فورية
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
-              <CardContent className="p-6">
-                <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <BarChart3 className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-3 text-white">تحليل البيانات</h3>
-                <p className="text-gray-400 mb-4">
-                  استخراج رؤى قيمة من بياناتك باستخدام خوارزميات التعلم الآلي المتقدمة
-                </p>
-                <ul className="space-y-2 text-sm text-gray-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    تحليل في الوقت الفعلي
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    تقارير تفاعلية
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
-              <CardContent className="p-6">
-                <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-3 text-white">الحلول المؤسسية</h3>
-                <p className="text-gray-400 mb-4">حلول مخصصة للشركات والمؤسسات لتحسين الكفاءة والإنتاجية</p>
-                <ul className="space-y-2 text-sm text-gray-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    تكامل مع الأنظمة الحالية
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    دعم فني متخصص
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section - محسن */}
-      <section id="features" className="py-20 relative z-10">
-        <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-gray-400 mb-6 border border-white/10">
-              <span>المميزات</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">لماذا تختار drx3؟</h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              نجمع بين أحدث التقنيات وسهولة الاستخدام لنقدم لك تجربة استثنائية
+              متخصص في تطوير حلول الذكاء الاصطناعي المتقدمة باستخدام أحدث التقنيات
             </p>
           </div>
 
@@ -284,10 +253,14 @@ export default function HomePage() {
             <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
               <CardContent className="p-6 text-center">
                 <div className="bg-gradient-to-r from-red-600 to-orange-500 w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                  <Zap className="w-8 h-8 text-white" />
+                  <Code className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-white">سرعة فائقة</h3>
-                <p className="text-gray-400">استجابة فورية وأداء متميز في جميع المهام مع زمن استجابة أقل من ثانية</p>
+                <h3 className="text-xl font-bold mb-3 text-white">Python</h3>
+                <p className="text-gray-400 text-sm mb-4">تطوير التطبيقات والذكاء الاصطناعي</p>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-red-600 to-orange-500 h-2 rounded-full w-[95%]"></div>
+                </div>
+                <span className="text-xs text-gray-400 mt-2 block">95%</span>
               </CardContent>
             </Card>
 
@@ -296,96 +269,281 @@ export default function HomePage() {
                 <div className="bg-gradient-to-r from-red-600 to-orange-500 w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
                   <Brain className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-white">ذكاء متقدم</h3>
-                <p className="text-gray-400">تقنيات الذكاء الاصطناعي الأحدث مع نماذج مدربة على مليارات البيانات</p>
+                <h3 className="text-xl font-bold mb-3 text-white">RAG Systems</h3>
+                <p className="text-gray-400 text-sm mb-4">أنظمة الاسترجاع المعززة</p>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-red-600 to-orange-500 h-2 rounded-full w-[90%]"></div>
+                </div>
+                <span className="text-xs text-gray-400 mt-2 block">90%</span>
               </CardContent>
             </Card>
 
             <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
               <CardContent className="p-6 text-center">
                 <div className="bg-gradient-to-r from-red-600 to-orange-500 w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                  <Shield className="w-8 h-8 text-white" />
+                  <Cpu className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-white">أمان عالي</h3>
-                <p className="text-gray-400">حماية متقدمة لبياناتك مع تشفير من الطراز العسكري وامتثال كامل للمعايير</p>
+                <h3 className="text-xl font-bold mb-3 text-white">Groq API</h3>
+                <p className="text-gray-400 text-sm mb-4">تكامل وتحسين APIs</p>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-red-600 to-orange-500 h-2 rounded-full w-[85%]"></div>
+                </div>
+                <span className="text-xs text-gray-400 mt-2 block">85%</span>
               </CardContent>
             </Card>
 
             <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
               <CardContent className="p-6 text-center">
                 <div className="bg-gradient-to-r from-red-600 to-orange-500 w-16 h-16 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                  <Rocket className="w-8 h-8 text-white" />
+                  <Database className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-white">تطوير مستمر</h3>
-                <p className="text-gray-400">تحديثات دورية وميزات جديدة مع فريق تطوير يعمل على مدار الساعة</p>
+                <h3 className="text-xl font-bold mb-3 text-white">Vector DBs</h3>
+                <p className="text-gray-400 text-sm mb-4">قواعد البيانات المتجهة</p>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-red-600 to-orange-500 h-2 rounded-full w-[88%]"></div>
+                </div>
+                <span className="text-xs text-gray-400 mt-2 block">88%</span>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
 
-      {/* CTA Section - جديد */}
-      <section className="py-20 relative z-10">
+      {/* Projects Section - محسن */}
+      <section id="projects" className="py-20 relative z-10">
         <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
-          <Card className="bg-gradient-to-r from-red-600/20 to-orange-500/20 backdrop-blur-sm border-red-500/30 overflow-hidden">
-            <CardContent className="p-12 text-center relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-red-600/10 to-orange-500/10" />
-              <div className="relative z-10">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">جاهز لتجربة المستقبل؟</h2>
-                <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                  انضم إلى آلاف المستخدمين الذين يستفيدون من قوة الذكاء الاصطناعي يومياً
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="/chat">
-                    <Button className="bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600 transition-all duration-300 rounded-full px-8 py-4 text-lg font-medium shadow-xl hover:shadow-red-500/30 hover:scale-105 group">
-                      <MessageSquare className="w-5 h-5 ml-2 group-hover:rotate-12 transition-transform" />
-                      ابدأ مجاناً الآن
-                      <ArrowRight className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </Link>
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-gray-400 mb-6 border border-white/10">
+              <Rocket className="w-4 h-4" />
+              <span>المشاريع</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">مشاريعي المبتكرة</h2>
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+              مجموعة من المشاريع التي تجمع بين الذكاء الاصطناعي والحلول العملية
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
+              <CardContent className="p-6">
+                <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <BookOpen className="w-6 h-6 text-white" />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <h3 className="text-xl font-bold mb-3 text-white">منصة تعليمية تفاعلية</h3>
+                <p className="text-gray-400 mb-4">
+                  منصة تستخدم الذكاء الاصطناعي لتخصيص تجربة التعلم حسب احتياجات الطالب مع خوارزميات متقدمة لتتبع التقدم
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="bg-red-500/20 text-red-300 px-2 py-1 rounded-full text-xs">Python</span>
+                  <span className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs">RAG</span>
+                  <span className="bg-green-500/20 text-green-300 px-2 py-1 rounded-full text-xs">ML</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    <Github className="w-4 h-4 ml-1" />
+                    الكود
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                    عرض
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
+              <CardContent className="p-6">
+                <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Database className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-white">نظام قاعدة البيانات المتجهة</h3>
+                <p className="text-gray-400 mb-4">
+                  نظام متقدم لإدارة البيانات المتجهة مع تحسينات للبحث الدلالي والاسترجاع السريع، مُحسَّن للتطبيقات العربية
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="bg-red-500/20 text-red-300 px-2 py-1 rounded-full text-xs">Vector DB</span>
+                  <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full text-xs">Embeddings</span>
+                  <span className="bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded-full text-xs">Arabic NLP</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    <Github className="w-4 h-4 ml-1" />
+                    الكود
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                    عرض
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300 group hover:scale-105">
+              <CardContent className="p-6">
+                <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <MessageSquare className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-white">مساعد ذكي متعدد اللغات</h3>
+                <p className="text-gray-400 mb-4">
+                  مساعد ذكي يدعم العربية والإنجليزية مع قدرات متقدمة في فهم السياق والرد بطريقة طبيعية
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="bg-red-500/20 text-red-300 px-2 py-1 rounded-full text-xs">Groq API</span>
+                  <span className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs">NLP</span>
+                  <span className="bg-green-500/20 text-green-300 px-2 py-1 rounded-full text-xs">Multilingual</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    <Github className="w-4 h-4 ml-1" />
+                    الكود
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                    تجربة
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* GitHub Stats */}
+          <div className="mt-16 text-center">
+            <Card className="bg-gradient-to-r from-red-600/20 to-orange-500/20 backdrop-blur-sm border-red-500/30 max-w-2xl mx-auto">
+              <CardContent className="p-8">
+                <div className="grid grid-cols-3 gap-8">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-red-400 mb-2">15+</div>
+                    <div className="text-sm text-gray-400">مشروع نشط</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-yellow-400 mb-2">1.2K+</div>
+                    <div className="text-sm text-gray-400">نجمة GitHub</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-green-400 mb-2">500+</div>
+                    <div className="text-sm text-gray-400">مساهمة</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 
-      {/* About Section - محسن */}
+      {/* About Section - محسن مع المعلومات الشخصية */}
       <section id="about" className="py-20 relative z-10">
         <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-gray-400 border border-white/10">
-                <span>من نحن</span>
+                <Users className="w-4 h-4" />
+                <span>من أنا</span>
               </div>
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
-                نحن فريق من المطورين والمبدعين
+                عبد العزيز الحمداني
+                <br />
+                <span className="text-2xl md:text-3xl text-red-400">مهندس برمجيات من عُمان</span>
               </h2>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                نحن مجموعة من المطورين المتحمسين الذين يؤمنون بقوة التكنولوجيا في تغيير العالم. نعمل على تطوير حلول
-                مبتكرة باستخدام أحدث تقنيات الذكاء الاصطناعي والبرمجة.
-              </p>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                هدفنا هو إنشاء منتجات تساعد الناس وتجعل حياتهم أسهل وأكثر إنتاجية. نؤمن بأن الذكاء الاصطناعي يجب أن يكون
-                في متناول الجميع، وليس حكراً على الشركات الكبرى.
-              </p>
+
+              <div className="space-y-6">
+                <p className="text-lg text-gray-300 leading-relaxed">
+                  أنا عبد العزيز الحمداني من سلطنة عُمان، مهندس برمجيات متخصص في تطوير حلول الذكاء الاصطناعي المتقدمة.
+                  أركز على تطوير أنظمة RAG والتكامل مع Groq API لإنشاء تطبيقات ذكية عالية الأداء.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Code className="w-5 h-5 text-red-400" />
+                      <span className="font-semibold text-white">التخصص الرئيسي</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">
+                      تطوير التطبيقات بـ Python مع التركيز على مكتبات الذكاء الاصطناعي
+                    </p>
+                  </div>
+
+                  <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Brain className="w-5 h-5 text-red-400" />
+                      <span className="font-semibold text-white">أنظمة RAG</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">تطوير حلول Retrieval-Augmented Generation للتطبيقات الذكية</p>
+                  </div>
+
+                  <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Cpu className="w-5 h-5 text-red-400" />
+                      <span className="font-semibold text-white">تكامل APIs</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">خبرة في استخدام وتحسين Groq API وواجهات الذكاء الاصطناعي</p>
+                  </div>
+
+                  <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Globe className="w-5 h-5 text-red-400" />
+                      <span className="font-semibold text-white">الحلول المبتكرة</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">تطوير حلول تجمع بين التقنيات الحديثة والاحتياجات العملية</p>
+                  </div>
+                </div>
+
+                <p className="text-lg text-gray-300 leading-relaxed">
+                  هدفي هو إنشاء منتجات تساعد الناس وتجعل حياتهم أسهل وأكثر إنتاجية. أؤمن بأن الذكاء الاصطناعي يجب أن
+                  يكون في متناول الجميع، وأعمل على تطوير حلول تدعم اللغة العربية وتخدم المجتمع العربي.
+                </p>
+              </div>
+
               <div className="flex flex-col sm:flex-row gap-4">
+                <Button
+                  className="bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600 transition-all duration-300 rounded-full px-6 py-3 font-medium"
+                  asChild
+                >
+                  <Link href="#contact">
+                    <Mail className="size-4 ml-2" />
+                    تواصل معي
+                  </Link>
+                </Button>
                 <Button
                   variant="outline"
                   className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-full px-6 py-3 transition-all duration-300 bg-transparent backdrop-blur-sm"
                   asChild
                 >
-                  <Link href="#contact">
-                    <Mail className="size-4 ml-2" />
-                    تواصل معنا
+                  <Link href="https://github.com/wolfomani">
+                    <Github className="size-4 ml-2" />
+                    GitHub Profile
                   </Link>
                 </Button>
               </div>
             </div>
+
             <div className="relative">
               <div className="relative group">
                 <img
-                  alt="فريق التطوير"
+                  alt="عبد العزيز الحمداني في بيئة العمل"
                   loading="lazy"
                   width="500"
                   height="500"
@@ -395,8 +553,8 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-2xl" />
                 <div className="absolute bottom-6 left-6 right-6">
                   <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <div className="text-white font-semibold">فريق drx3</div>
-                    <div className="text-gray-300 text-sm">مطورون ومبدعون في مجال الذكاء الاصطناعي</div>
+                    <div className="text-white font-semibold">مطور من سلطنة عُمان</div>
+                    <div className="text-gray-300 text-sm">متخصص في الذكاء الاصطناعي والبرمجة</div>
                   </div>
                 </div>
               </div>
@@ -410,40 +568,69 @@ export default function HomePage() {
         <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-gray-400 mb-6 border border-white/10">
-              <span>تواصل معنا</span>
+              <Mail className="w-4 h-4" />
+              <span>تواصل معي</span>
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">نحن هنا للمساعدة</h2>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">دعنا نتعاون</h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              لديك سؤال أو تريد التعاون معنا؟ فريقنا جاهز للرد على استفساراتك
+              هل لديك مشروع مثير أو فكرة تريد تطويرها؟ أنا متاح للتعاون في مشاريع الذكاء الاصطناعي المبتكرة
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300">
-                  <CardContent className="p-6 text-center">
-                    <Mail className="w-8 h-8 text-red-400 mx-auto mb-4" />
-                    <h3 className="font-semibold text-white mb-2">البريد الإلكتروني</h3>
-                    <p className="text-gray-400 text-sm">contact@drx3.com</p>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center">
+                        <Mail className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white mb-1">البريد الإلكتروني</h3>
+                        <p className="text-gray-400">openaziz00@gmail.com</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
+
                 <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300">
-                  <CardContent className="p-6 text-center">
-                    <MessageSquare className="w-8 h-8 text-red-400 mx-auto mb-4" />
-                    <h3 className="font-semibold text-white mb-2">الدعم الفني</h3>
-                    <p className="text-gray-400 text-sm">24/7 متاح</p>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center">
+                        <MessageSquare className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white mb-1">Telegram</h3>
+                        <p className="text-gray-400">@wolfaiOM</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-gradient-to-r from-red-600 to-orange-500 w-12 h-12 rounded-lg flex items-center justify-center">
+                        <Github className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white mb-1">GitHub</h3>
+                        <p className="text-gray-400">wolfomani</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
+
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   className="bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600 transition-all duration-300 rounded-full px-6 py-3 font-medium flex-1"
                   asChild
                 >
-                  <Link href="mailto:contact@drx3.com">
+                  <Link href="mailto:openaziz00@gmail.com">
                     <Mail className="size-4 ml-2" />
-                    راسلنا الآن
+                    راسلني الآن
                   </Link>
                 </Button>
                 <Button
@@ -451,17 +638,18 @@ export default function HomePage() {
                   className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-full px-6 py-3 transition-all duration-300 bg-transparent backdrop-blur-sm flex-1"
                   asChild
                 >
-                  <Link href="https://twitter.com/drx3">
-                    <ExternalLink className="size-4 ml-2" />
-                    تابعنا على تويتر
+                  <Link href="https://t.me/wolfaiOM">
+                    <MessageSquare className="size-4 ml-2" />
+                    Telegram
                   </Link>
                 </Button>
               </div>
             </div>
+
             <div className="relative">
               <div className="relative group">
                 <img
-                  alt="تواصل معنا"
+                  alt="تواصل مع عبد العزيز الحمداني"
                   loading="lazy"
                   width="400"
                   height="400"
@@ -469,81 +657,10 @@ export default function HomePage() {
                   src="/images/anime2.jpg"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-2xl" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* GitHub Section - محسن */}
-      <section id="github" className="py-20 relative z-10">
-        <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-gray-400 mb-6 border border-white/10">
-              <Github className="w-4 h-4" />
-              <span>مفتوح المصدر</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">مشاريعنا مفتوحة المصدر</h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              نؤمن بقوة المجتمع المفتوح. تصفح مشاريعنا وساهم في تطوير المجتمع التقني العربي
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300">
-                  <CardContent className="p-6">
-                    <Github className="w-8 h-8 text-red-400 mb-4" />
-                    <h3 className="font-semibold text-white mb-2">المشاريع النشطة</h3>
-                    <p className="text-2xl font-bold text-red-400">15+</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-red-500/50 transition-all duration-300">
-                  <CardContent className="p-6">
-                    <Star className="w-8 h-8 text-yellow-400 mb-4" />
-                    <h3 className="font-semibold text-white mb-2">النجوم</h3>
-                    <p className="text-2xl font-bold text-yellow-400">1.2K+</p>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button
-                  className="bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600 transition-all duration-300 rounded-full px-6 py-3 font-medium flex-1"
-                  asChild
-                >
-                  <Link href="https://github.com/drx3">
-                    <Github className="size-4 ml-2" />
-                    زيارة GitHub
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-full px-6 py-3 transition-all duration-300 bg-transparent backdrop-blur-sm flex-1"
-                  asChild
-                >
-                  <Link href="https://github.com/drx3/projects">
-                    <ExternalLink className="size-4 ml-2" />
-                    المشاريع
-                  </Link>
-                </Button>
-              </div>
-            </div>
-            <div className="relative">
-              <div className="relative group">
-                <img
-                  alt="مشاريع GitHub"
-                  loading="lazy"
-                  width="400"
-                  height="400"
-                  className="w-full rounded-2xl shadow-2xl group-hover:scale-105 transition-transform duration-300"
-                  src="/images/anime3.jpg"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-2xl" />
                 <div className="absolute bottom-6 left-6 right-6">
                   <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <div className="text-white font-semibold">مشاريع مفتوحة المصدر</div>
-                    <div className="text-gray-300 text-sm">ساهم في تطوير المجتمع التقني</div>
+                    <div className="text-white font-semibold">متاح للتعاون</div>
+                    <div className="text-gray-300 text-sm">مشاريع الذكاء الاصطناعي والتطوير</div>
                   </div>
                 </div>
               </div>
@@ -558,78 +675,112 @@ export default function HomePage() {
           <div className="mx-auto w-full px-4 lg:px-6 xl:max-w-7xl">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
               <div className="space-y-4">
-                <div className="text-2xl font-bold gradient-text">drx3</div>
-                <p className="text-gray-400 text-sm">منصة الذكاء الاصطناعي المتقدمة التي تقدم حلولاً مبتكرة للجميع</p>
+                <div className="text-2xl font-bold gradient-text">عبد العزيز الحمداني</div>
+                <p className="text-gray-400 text-sm">
+                  مهندس برمجيات متخصص في الذكاء الاصطناعي من سلطنة عُمان. أطور حلول RAG المتقدمة وأعمل مع Groq API
+                </p>
+                <div className="flex gap-3">
+                  <Link
+                    href="https://github.com/wolfomani"
+                    className="bg-white/10 backdrop-blur-sm rounded-full p-2 hover:bg-white/20 transition-all duration-300"
+                    aria-label="GitHub"
+                  >
+                    <Github className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href="https://t.me/wolfaiOM"
+                    className="bg-white/10 backdrop-blur-sm rounded-full p-2 hover:bg-white/20 transition-all duration-300"
+                    aria-label="Telegram"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href="mailto:openaziz00@gmail.com"
+                    className="bg-white/10 backdrop-blur-sm rounded-full p-2 hover:bg-white/20 transition-all duration-300"
+                    aria-label="Email"
+                  >
+                    <Mail className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
+
               <div className="space-y-4">
-                <h3 className="font-semibold text-white">الخدمات</h3>
+                <h3 className="font-semibold text-white">المهارات</h3>
                 <ul className="space-y-2 text-sm text-gray-400">
+                  <li>
+                    <Link href="#skills" className="hover:text-white transition-colors">
+                      Python Development
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="#skills" className="hover:text-white transition-colors">
+                      RAG Systems
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="#skills" className="hover:text-white transition-colors">
+                      Groq API
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="#skills" className="hover:text-white transition-colors">
+                      Vector Databases
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold text-white">المشاريع</h3>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li>
+                    <Link href="#projects" className="hover:text-white transition-colors">
+                      منصة تعليمية تفاعلية
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="#projects" className="hover:text-white transition-colors">
+                      قاعدة البيانات المتجهة
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="#projects" className="hover:text-white transition-colors">
+                      مساعد ذكي متعدد اللغات
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold text-white">التواصل</h3>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li>
+                    <Link href="#contact" className="hover:text-white transition-colors">
+                      تواصل معي
+                    </Link>
+                  </li>
                   <li>
                     <Link href="/chat" className="hover:text-white transition-colors">
                       المحادثة الذكية
                     </Link>
                   </li>
                   <li>
-                    <Link href="#" className="hover:text-white transition-colors">
-                      تحليل البيانات
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="#" className="hover:text-white transition-colors">
-                      الحلول المؤسسية
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-              <div className="space-y-4">
-                <h3 className="font-semibold text-white">الشركة</h3>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li>
                     <Link href="#about" className="hover:text-white transition-colors">
-                      من نحن
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="#contact" className="hover:text-white transition-colors">
-                      تواصل معنا
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="#" className="hover:text-white transition-colors">
-                      الوظائف
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-              <div className="space-y-4">
-                <h3 className="font-semibold text-white">المطورون</h3>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li>
-                    <Link href="#github" className="hover:text-white transition-colors">
-                      GitHub
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="#" className="hover:text-white transition-colors">
-                      API
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="#" className="hover:text-white transition-colors">
-                      الوثائق
+                      من أنا
                     </Link>
                   </li>
                 </ul>
               </div>
             </div>
+
             <div className="border-t border-white/10 pt-8">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="text-sm text-gray-500">© 2024 drx3. جميع الحقوق محفوظة.</div>
+                <div className="text-sm text-gray-500">© 2024 عبد العزيز الحمداني. جميع الحقوق محفوظة.</div>
                 <div className="flex gap-6">
-                  <Link href="#" className="text-gray-400 hover:text-white transition-colors">
+                  <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                     سياسة الخصوصية
                   </Link>
-                  <Link href="#" className="text-gray-400 hover:text-white transition-colors">
+                  <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                     شروط الاستخدام
                   </Link>
                 </div>
