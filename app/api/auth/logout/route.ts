@@ -1,25 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { AuthService } from "@/lib/auth"
-import { cookies } from "next/headers"
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const sessionId = cookieStore.get("session_id")?.value
+    const token = request.cookies.get("auth_token")?.value
 
-    if (sessionId) {
-      await AuthService.destroySession(sessionId)
+    if (token) {
+      await AuthService.logout(token)
     }
 
-    // حذف كوكي الجلسة
-    cookieStore.delete("session_id")
+    const response = NextResponse.json({ success: true, message: "تم تسجيل الخروج بنجاح" })
+    response.cookies.delete("auth_token")
 
-    return NextResponse.json({
-      success: true,
-      message: "Logged out successfully",
-    })
+    return response
   } catch (error) {
     console.error("Logout error:", error)
-    return NextResponse.json({ error: "Logout failed" }, { status: 500 })
+    return NextResponse.json({ success: false, message: "حدث خطأ أثناء تسجيل الخروج" }, { status: 500 })
   }
 }

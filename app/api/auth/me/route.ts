@@ -1,30 +1,48 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { AuthService } from "@/lib/auth"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const user = await AuthService.getCurrentUser()
+    const token = request.cookies.get("auth_token")?.value
 
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    if (!token) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "غير مصرح",
+          user: null,
+        },
+        { status: 200 },
+      ) // Return 200 instead of 401 to avoid error
+    }
+
+    const result = await AuthService.validateSession(token)
+
+    if (!result) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "جلسة غير صالحة",
+          user: null,
+        },
+        { status: 200 },
+      )
     }
 
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        github_username: user.github_username,
-        name: user.name,
-        avatar_url: user.avatar_url,
-        is_verified: user.is_verified,
-        created_at: user.created_at,
-        last_login: user.last_login,
-      },
+      user: result.user,
+      message: "تم العثور على المستخدم",
     })
   } catch (error) {
     console.error("Get user error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        message: "حدث خطأ في الخادم",
+        user: null,
+      },
+      { status: 200 },
+    )
   }
 }

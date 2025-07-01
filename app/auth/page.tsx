@@ -4,231 +4,254 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Github, Phone, Loader2, CheckCircle, AlertCircle } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { Github, Phone, ArrowRight, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [phone, setPhone] = useState("")
-  const [verificationCode, setVerificationCode] = useState("")
-  const [isCodeSent, setIsCodeSent] = useState(false)
-  const [message, setMessage] = useState("")
+  const [code, setCode] = useState("")
+  const [step, setStep] = useState<"phone" | "verify">("phone")
   const [error, setError] = useState("")
-  const [countdown, setCountdown] = useState(0)
+  const [success, setSuccess] = useState("")
+
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  // عد تنازلي لإعادة الإرسال
   useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [countdown])
-
-  // تسجيل الدخول عبر GitHub
-  const handleGitHubLogin = async () => {
-    setIsLoading(true)
-    setError("")
-
-    try {
-      const response = await fetch("/api/auth/github", {
-        method: "POST",
-      })
-
-      const data = await response.json()
-
-      if (data.success && data.auth_url) {
-        window.location.href = data.auth_url
-      } else {
-        throw new Error("Failed to initiate GitHub authentication")
+    const error = searchParams.get("error")
+    if (error) {
+      switch (error) {
+        case "github_error":
+          setError("حدث خطأ في تسجيل الدخول عبر GitHub")
+          break
+        case "no_code":
+          setError("لم يتم الحصول على رمز التفويض")
+          break
+        case "auth_failed":
+          setError("فشل في المصادقة")
+          break
+        case "server_error":
+          setError("حدث خطأ في الخادم")
+          break
+        default:
+          setError("حدث خطأ غير متوقع")
       }
-    } catch (err) {
-      setError("فشل في تسجيل الدخول عبر GitHub")
-      console.error("GitHub auth error:", err)
-    } finally {
-      setIsLoading(false)
     }
+  }, [searchParams])
+
+  const handleGitHubLogin = () => {
+    setIsLoading(true)
+    window.location.href = "/api/auth/github"
   }
 
-  // إرسال رمز التحقق للهاتف
-  const handleSendCode = async (e: React.FormEvent) => {
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
-    setMessage("")
-
-    // التحقق من صيغة رقم الهاتف
-    const phoneRegex = /^\+[1-9]\d{1,14}$/
-    if (!phoneRegex.test(phone)) {
-      setError("يرجى إدخال رقم الهاتف بالصيغة الدولية (مثال: +96812345678)")
-      setIsLoading(false)
-      return
-    }
 
     try {
       const response = await fetch("/api/auth/phone/send", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setIsCodeSent(true)
-        setMessage("تم إرسال رمز التحقق إلى هاتفك")
-        setCountdown(60) // 60 ثانية قبل إمكانية الإرسال مرة أخرى
-
-        // في بيئة التطوير، اعرض الرمز
-        if (data.code) {
-          setMessage(`رمز التحقق (للاختبار): ${data.code}`)
-        }
+        setSuccess("تم إرسال رمز التحقق بنجاح")
+        setStep("verify")
       } else {
-        setError(data.error || "فشل في إرسال رمز التحقق")
+        setError(data.message || "فشل في إرسال رمز التحقق")
       }
-    } catch (err) {
-      setError("حدث خطأ في الشبكة")
-      console.error("Send code error:", err)
+    } catch (error) {
+      setError("حدث خطأ في الاتصال")
     } finally {
       setIsLoading(false)
     }
   }
 
-  // التحقق من الرمز
-  const handleVerifyCode = async (e: React.FormEvent) => {
+  const handleCodeVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    if (verificationCode.length !== 6) {
-      setError("يجب أن يكون رمز التحقق مكوناً من 6 أرقام")
-      setIsLoading(false)
-      return
-    }
-
     try {
       const response = await fetch("/api/auth/phone/verify", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone, code: verificationCode }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setMessage("تم تسجيل الدخول بنجاح!")
-        setTimeout(() => {
-          router.push("/")
-        }, 1500)
+        setSuccess("تم التحقق بنجاح")
+        router.push("/dashboard")
       } else {
-        setError(data.error || "رمز التحقق غير صحيح")
+        setError(data.message || "رمز التحقق غير صحيح")
       }
-    } catch (err) {
-      setError("حدث خطأ في التحقق")
-      console.error("Verify code error:", err)
+    } catch (error) {
+      setError("حدث خطأ في الاتصال")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">مرحباً بك</CardTitle>
-          <CardDescription>سجل الدخول للوصول إلى منصة الذكاء الاصطناعي</CardDescription>
-        </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-black via-red-950/20 to-black flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <Link href="/" className="inline-block mb-6">
+            <div className="text-2xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+              عبد العزيز الحمداني
+            </div>
+          </Link>
+          <h1 className="text-3xl font-bold text-white mb-2">مرحباً بك</h1>
+          <p className="text-gray-400">سجل دخولك للوصول إلى المساعد الذكي</p>
+        </div>
 
-        <CardContent>
-          <Tabs defaultValue="github" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="github" className="flex items-center gap-2">
-                <Github className="w-4 h-4" /> تسجيل الدخول عبر GitHub
-              </TabsTrigger>
-              <TabsTrigger value="phone" className="flex items-center gap-2">
-                <Phone className="w-4 h-4" /> تسجيل الدخول عبر الهاتف
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="github">
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <Button onClick={handleGitHubLogin} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Github className="w-4 h-4" />} تسجيل
-                  الدخول عبر GitHub
-                </Button>
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </TabsContent>
-            <TabsContent value="phone">
-              <form onSubmit={handleSendCode} className="flex flex-col space-y-4">
-                <Input
-                  type="tel"
-                  placeholder="رقم الهاتف الدولي"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={isLoading || isCodeSent}
-                />
-                <Button type="submit" disabled={isLoading || isCodeSent}>
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "إرسال رمز التحقق"}
-                </Button>
-                {message && (
-                  <Alert variant="success">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertDescription>{message}</AlertDescription>
-                  </Alert>
-                )}
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-              </form>
-              {isCodeSent && (
-                <form onSubmit={handleVerifyCode} className="flex flex-col space-y-4 mt-4">
+        {/* Error/Success Messages */}
+        {error && (
+          <Alert className="border-red-500/50 bg-red-500/10">
+            <AlertDescription className="text-red-400">{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert className="border-green-500/50 bg-green-500/10">
+            <AlertDescription className="text-green-400">{success}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* GitHub Login */}
+        <Card className="bg-white/5 backdrop-blur-sm border-white/10">
+          <CardContent className="p-6">
+            <Button
+              onClick={handleGitHubLogin}
+              disabled={isLoading}
+              className="w-full bg-[#24292e] hover:bg-[#1a1e22] text-white"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Github className="w-4 h-4 ml-2" />}
+              تسجيل الدخول عبر GitHub
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-black text-gray-400">أو</span>
+          </div>
+        </div>
+
+        {/* Phone Login */}
+        <Card className="bg-white/5 backdrop-blur-sm border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <Phone className="w-5 h-5 ml-2" />
+              تسجيل الدخول برقم الهاتف
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {step === "phone" ? (
+              <form onSubmit={handlePhoneSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="phone" className="text-gray-300">
+                    رقم الهاتف
+                  </Label>
                   <Input
-                    type="text"
-                    placeholder="رمز التحقق"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    disabled={isLoading}
+                    id="phone"
+                    type="tel"
+                    placeholder="+968 9X XXX XXX"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                    required
                   />
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "تحقق من الرمز"}
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  )}
+                  إرسال رمز التحقق
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleCodeVerify} className="space-y-4">
+                <div>
+                  <Label htmlFor="code" className="text-gray-300">
+                    رمز التحقق
+                  </Label>
+                  <Input
+                    id="code"
+                    type="text"
+                    placeholder="123456"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                    maxLength={6}
+                    required
+                  />
+                  <p className="text-sm text-gray-400 mt-1">تم إرسال الرمز إلى {phone}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("phone")}
+                    className="flex-1 border-white/30 text-white hover:bg-white/10 bg-transparent"
+                  >
+                    رجوع
                   </Button>
-                  {message && (
-                    <Alert variant="success">
-                      <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>{message}</AlertDescription>
-                    </Alert>
-                  )}
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  {countdown > 0 && (
-                    <div className="text-sm text-center mt-2">يمكنك إعادة إرسال الرمز بعد {countdown} ثانية</div>
-                  )}
-                </form>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="flex-1 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    )}
+                    تحقق
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="text-center text-sm text-gray-400">
+          <p>
+            بالمتابعة، أنت توافق على{" "}
+            <Link href="/terms" className="text-red-400 hover:underline">
+              شروط الاستخدام
+            </Link>{" "}
+            و{" "}
+            <Link href="/privacy" className="text-red-400 hover:underline">
+              سياسة الخصوصية
+            </Link>
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

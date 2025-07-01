@@ -1,69 +1,84 @@
 import type { NextRequest } from "next/server"
-import { streamText } from "ai"
-import { SmartModelSelector, getModel } from "@/lib/ai-providers"
-
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
+import { aiOrchestrator } from "@/lib/ai-providers"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { messages, conversationId, userId, providerId, model, maxTokens, temperature } = body
+    const { message, config, context } = await request.json()
 
-    // التحقق من صحة البيانات
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: "الرسائل مطلوبة ويجب أن تكون مصفوفة غير فارغة" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      })
+    if (!message || typeof message !== "string") {
+      return new Response("رسالة غير صالحة", { status: 400 })
     }
 
-    const lastMessage = messages[messages.length - 1]
-    let selectedModel = model
+    // Build enhanced prompt with context
+    let enhancedPrompt = message
 
-    if (!selectedModel) {
-      const bestModel = SmartModelSelector.selectBestModel(lastMessage.content)
-      selectedModel = `${bestModel.provider}/${bestModel.id}`
+    if (context && context.length > 0) {
+      const contextStr = context
+        .filter((msg: any) => msg.sender === "user")
+        .slice(-3)
+        .map((msg: any) => msg.text)
+        .join("\n")
+
+      enhancedPrompt = `السياق السابق:\n${contextStr}\n\nالسؤال الحالي: ${message}`
     }
 
-    const aiModel = getModel(selectedModel)
-    SmartModelSelector.recordUsage(selectedModel)
-
-    // إضافة رسالة النظام
-    const systemMessage = {
-      role: "system" as const,
-      content: `أنت مساعد ذكي متقدم. تجيب بوضوح ودقة. 
-      إذا كان السؤال بالعربية، أجب بالعربية الفصحى المبسطة.
-      إذا كان بالإنجليزية، أجب بالإنجليزية.`,
+    // Add system instructions
+    if (config?.ragEnabled) {
+      enhancedPrompt = `[نظام RAG مفعل] استخدم قاعدة المعرفة للإجابة بدقة.\n${enhancedPrompt}`
     }
 
-    const result = await streamText({
-      model: aiModel,
-      messages: [systemMessage, ...messages],
-      temperature: temperature || 0.7,
-      maxTokens: maxTokens || 2048,
-      onFinish: async (result) => {
-        // تسجيل الإحصائيات
-        console.log("Stream finished:", {
-          model: selectedModel,
-          usage: result.usage,
-          finishReason: result.finishReason,
-        })
+    if (config?.deepSearch) {
+      enhancedPrompt = `[بحث عميق مطلوب] قم بتحليل شامل ومتعمق.\n${enhancedPrompt}`
+    }
+
+    if (config?.thinkMode) {
+      enhancedPrompt = `[وضع التفكير] فكر خطوة بخطوة قبل الإجابة.\n${enhancedPrompt}`
+    }
+
+    // Create a readable stream
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const aiConfig = {
+            provider: config?.provider || "auto",
+            model: config?.model,
+            temperature: config?.temperature || 0.7,
+            max_tokens: config?.maxTokens || 2000,
+            deep_thinking: config?.thinkMode || false,
+          }
+
+          await aiOrchestrator.generateStreamResponse(
+            enhancedPrompt,
+            (chunk: string) => {
+              const data = JSON.stringify({ content: chunk })
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+            },
+            aiConfig,
+          )
+
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+          controller.close()
+        } catch (error) {
+          console.error("Stream error:", error)
+          const errorData = JSON.stringify({
+            error: error instanceof Error ? error.message : "خطأ غير معروف",
+          })
+          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
+          controller.close()
+        }
       },
     })
 
-    return result.toAIStreamResponse()
-  } catch (error) {
-    console.error("خطأ في إعداد البث المباشر:", error)
-
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "حدث خطأ في إعداد البث المباشر",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
-    )
+    })
+  } catch (error) {
+    console.error("Stream API Error:", error)
+    return new Response("خطأ داخلي في الخادم", { status: 500 })
   }
 }

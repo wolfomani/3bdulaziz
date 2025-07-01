@@ -1,9 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { AuthService, setSessionCookie } from "@/lib/auth"
-
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!
-const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI!
+import { AuthService } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -11,18 +7,17 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state")
 
   if (!code) {
-    // إعادة توجيه إلى GitHub للمصادقة
-    const githubAuthUrl = new URL("https://github.com/login/oauth/authorize")
-    githubAuthUrl.searchParams.set("client_id", GITHUB_CLIENT_ID)
-    githubAuthUrl.searchParams.set("redirect_uri", GITHUB_REDIRECT_URI)
-    githubAuthUrl.searchParams.set("scope", "user:email")
-    githubAuthUrl.searchParams.set("state", Math.random().toString(36).substring(7))
+    // Redirect to GitHub OAuth
+    const clientId = process.env.GITHUB_CLIENT_ID || "Ov23liupXR6o8HmvL3Nj"
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/api/auth/github/callback`
 
-    return NextResponse.redirect(githubAuthUrl.toString())
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`
+
+    return NextResponse.redirect(githubAuthUrl)
   }
 
   try {
-    // تبديل الكود بـ access token
+    // Exchange code for access token
     const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
       headers: {
@@ -30,97 +25,61 @@ export async function GET(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
+        client_id: process.env.GITHUB_CLIENT_ID!,
+        client_secret: process.env.GITHUB_CLIENT_SECRET!,
         code,
-        redirect_uri: GITHUB_REDIRECT_URI,
       }),
     })
 
     const tokenData = await tokenResponse.json()
-
     if (!tokenData.access_token) {
       throw new Error("Failed to get access token")
     }
 
-    // الحصول على بيانات المستخدم من GitHub
+    // Get user info from GitHub
     const userResponse = await fetch("https://api.github.com/user", {
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
-        Accept: "application/vnd.github.v3+json",
+        Accept: "application/vnd.github+json",
       },
     })
 
     const githubUser = await userResponse.json()
 
-    // الحصول على البريد الإلكتروني
-    const emailResponse = await fetch("https://api.github.com/user/emails", {
-      headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    })
-
-    const emails = await emailResponse.json()
-    const primaryEmail = emails.find((email: any) => email.primary)?.email
-
-    // البحث عن مستخدم موجود أو إنشاء جديد
-    let user = await AuthService.findUser({
-      github_id: githubUser.id.toString(),
-      email: primaryEmail,
-    })
-
+    // Create or update user
+    let user = await AuthService.findUserByGitHubId(githubUser.id.toString())
     if (!user) {
-      user = await AuthService.createUser({
+      user = await AuthService.createOrUpdateUser({
+        email: githubUser.email,
+        name: githubUser.name || githubUser.login,
+        avatar: githubUser.avatar_url,
         github_id: githubUser.id.toString(),
         github_username: githubUser.login,
-        name: githubUser.name || githubUser.login,
-        email: primaryEmail,
-        avatar_url: githubUser.avatar_url,
         is_verified: true,
+        metadata: {
+          github_profile: githubUser,
+        },
       })
-    } else {
-      // تحديث البيانات
-      await AuthService.db.query(
-        `
-        UPDATE users SET 
-          github_username = $1, 
-          name = COALESCE($2, name),
-          avatar_url = COALESCE($3, avatar_url),
-          last_login = NOW()
-        WHERE id = $4
-      `,
-        [githubUser.login, githubUser.name, githubUser.avatar_url, user.id],
-      )
     }
 
-    // إنشاء جلسة
-    const userAgent = request.headers.get("user-agent") || undefined
-    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+    // Create session
+    const session = await AuthService.createSession(user.id, request)
 
-    const sessionId = await AuthService.createSession(user.id, userAgent, ipAddress)
+    // Set cookie and redirect
+    const response = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/dashboard`,
+    )
+    response.cookies.set("auth_token", session.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: "/",
+    })
 
-    // تعيين كوكي الجلسة
-    setSessionCookie(sessionId)
-
-    // إعادة توجيه إلى الصفحة الرئيسية
-    return NextResponse.redirect(new URL("/", request.url))
+    return response
   } catch (error) {
-    console.error("GitHub auth error:", error)
-    return NextResponse.redirect(new URL("/auth?error=github_auth_failed", request.url))
+    console.error("GitHub OAuth error:", error)
+    return NextResponse.json({ success: false, message: "خطأ في المصادقة" }, { status: 500 })
   }
-}
-
-export async function POST() {
-  // بدء عملية المصادقة مع GitHub
-  const githubAuthUrl = new URL("https://github.com/login/oauth/authorize")
-  githubAuthUrl.searchParams.set("client_id", GITHUB_CLIENT_ID)
-  githubAuthUrl.searchParams.set("redirect_uri", GITHUB_REDIRECT_URI)
-  githubAuthUrl.searchParams.set("scope", "user:email")
-  githubAuthUrl.searchParams.set("state", Math.random().toString(36).substring(7))
-
-  return NextResponse.json({
-    success: true,
-    auth_url: githubAuthUrl.toString(),
-  })
 }

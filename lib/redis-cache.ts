@@ -1,29 +1,37 @@
 import { Redis } from "@upstash/redis"
 
-// Redis client for caching and session management
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
   token: process.env.KV_REST_API_TOKEN!,
 })
 
 export interface CacheOptions {
-  ttl?: number // Time to live in seconds
   prefix?: string
+  ttl?: number // seconds
 }
 
-export class RedisCache {
-  private redis: Redis
-  private defaultTTL = 3600 // 1 hour
+export interface RateLimitResult {
+  allowed: boolean
+  remaining: number
+  resetTime: number
+}
 
-  constructor() {
-    this.redis = redis
+export interface SessionData {
+  id: string
+  user_id: string
+  expires_at: string
+}
+
+class RedisCache {
+  private getKey(key: string, prefix?: string): string {
+    return prefix ? `${prefix}:${key}` : key
   }
 
   // Basic cache operations
-  async get<T>(key: string, prefix?: string): Promise<T | null> {
+  async get<T = any>(key: string, prefix?: string): Promise<T | null> {
     try {
-      const fullKey = prefix ? `${prefix}:${key}` : key
-      const value = await this.redis.get(fullKey)
+      const fullKey = this.getKey(key, prefix)
+      const value = await redis.get(fullKey)
       return value as T
     } catch (error) {
       console.error("Redis GET error:", error)
@@ -31,12 +39,16 @@ export class RedisCache {
     }
   }
 
-  async set<T>(key: string, value: T, options: CacheOptions = {}): Promise<boolean> {
+  async set(key: string, value: any, options: CacheOptions = {}): Promise<boolean> {
     try {
-      const fullKey = options.prefix ? `${options.prefix}:${key}` : key
-      const ttl = options.ttl || this.defaultTTL
+      const fullKey = this.getKey(key, options.prefix)
 
-      await this.redis.setex(fullKey, ttl, JSON.stringify(value))
+      if (options.ttl) {
+        await redis.setex(fullKey, options.ttl, JSON.stringify(value))
+      } else {
+        await redis.set(fullKey, JSON.stringify(value))
+      }
+
       return true
     } catch (error) {
       console.error("Redis SET error:", error)
@@ -46,117 +58,320 @@ export class RedisCache {
 
   async del(key: string, prefix?: string): Promise<boolean> {
     try {
-      const fullKey = prefix ? `${prefix}:${key}` : key
-      await this.redis.del(fullKey)
-      return true
+      const fullKey = this.getKey(key, prefix)
+      const result = await redis.del(fullKey)
+      return result > 0
     } catch (error) {
       console.error("Redis DEL error:", error)
       return false
     }
   }
 
-  // Session management
-  async setSession(sessionId: string, sessionData: any, ttl = 86400): Promise<boolean> {
-    return this.set(sessionId, sessionData, { prefix: "session", ttl })
-  }
-
-  async getSession(sessionId: string): Promise<any> {
-    return this.get(sessionId, "session")
-  }
-
-  async deleteSession(sessionId: string): Promise<boolean> {
-    return this.del(sessionId, "session")
-  }
-
-  // Conversation caching
-  async cacheConversation(conversationId: string, messages: any[], ttl = 3600): Promise<boolean> {
-    return this.set(conversationId, messages, { prefix: "conversation", ttl })
-  }
-
-  async getCachedConversation(conversationId: string): Promise<any[] | null> {
-    return this.get(conversationId, "conversation")
+  async exists(key: string, prefix?: string): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const result = await redis.exists(fullKey)
+      return result > 0
+    } catch (error) {
+      console.error("Redis EXISTS error:", error)
+      return false
+    }
   }
 
   // Rate limiting
-  async checkRateLimit(
-    identifier: string,
-    limit: number,
-    window: number,
-  ): Promise<{
-    allowed: boolean
-    remaining: number
-    resetTime: number
-  }> {
+  async checkRateLimit(identifier: string, limit: number, windowSeconds: number): Promise<RateLimitResult> {
     try {
-      const key = `ratelimit:${identifier}`
-      const current = ((await this.redis.get(key)) as number) || 0
+      const key = `rate_limit:${identifier}`
+      const now = Math.floor(Date.now() / 1000)
+      const window = Math.floor(now / windowSeconds) * windowSeconds
+      const windowKey = `${key}:${window}`
 
-      if (current >= limit) {
-        const ttl = await this.redis.ttl(key)
+      // Get current count
+      const current = (await redis.get(windowKey)) || 0
+      const currentCount = typeof current === "number" ? current : Number.parseInt(current as string) || 0
+
+      if (currentCount >= limit) {
         return {
           allowed: false,
           remaining: 0,
-          resetTime: Date.now() + ttl * 1000,
+          resetTime: window + windowSeconds,
         }
       }
 
-      const newCount = current + 1
-      if (current === 0) {
-        await this.redis.setex(key, window, newCount)
-      } else {
-        await this.redis.incr(key)
+      // Increment counter
+      const newCount = await redis.incr(windowKey)
+
+      // Set expiration if this is the first increment
+      if (newCount === 1) {
+        await redis.expire(windowKey, windowSeconds)
       }
 
       return {
         allowed: true,
-        remaining: limit - newCount,
-        resetTime: Date.now() + window * 1000,
+        remaining: Math.max(0, limit - newCount),
+        resetTime: window + windowSeconds,
       }
     } catch (error) {
-      console.error("Rate limit check error:", error)
-      return { allowed: true, remaining: limit - 1, resetTime: Date.now() + window * 1000 }
+      console.error("Rate limit error:", error)
+      // Allow request on error
+      return {
+        allowed: true,
+        remaining: limit - 1,
+        resetTime: Math.floor(Date.now() / 1000) + windowSeconds,
+      }
     }
   }
 
-  // Model performance caching
-  async cacheModelPerformance(modelName: string, metrics: any, ttl = 1800): Promise<boolean> {
-    return this.set(modelName, metrics, { prefix: "model_perf", ttl })
+  // Session management
+  async setSession(token: string, sessionData: SessionData, ttlSeconds: number): Promise<boolean> {
+    try {
+      const key = `session:${token}`
+      await redis.setex(key, ttlSeconds, JSON.stringify(sessionData))
+      return true
+    } catch (error) {
+      console.error("Session set error:", error)
+      return false
+    }
   }
 
-  async getModelPerformance(modelName: string): Promise<any> {
-    return this.get(modelName, "model_perf")
+  async getSession(token: string): Promise<SessionData | null> {
+    try {
+      const key = `session:${token}`
+      const data = await redis.get(key)
+      return data ? JSON.parse(data as string) : null
+    } catch (error) {
+      console.error("Session get error:", error)
+      return null
+    }
   }
 
-  // System status caching
-  async cacheSystemStatus(status: any, ttl = 300): Promise<boolean> {
-    return this.set("system_status", status, { prefix: "system", ttl })
+  async deleteSession(token: string): Promise<boolean> {
+    try {
+      const key = `session:${token}`
+      const result = await redis.del(key)
+      return result > 0
+    } catch (error) {
+      console.error("Session delete error:", error)
+      return false
+    }
   }
 
-  async getSystemStatus(): Promise<any> {
-    return this.get("system_status", "system")
+  // AI response caching
+  async cacheAIResponse(queryHash: string, response: any, ttlSeconds = 1800): Promise<boolean> {
+    return this.set(`ai_response:${queryHash}`, response, { ttl: ttlSeconds })
   }
 
-  // Bulk operations
+  async getCachedAIResponse(queryHash: string): Promise<any> {
+    return this.get(`ai_response:${queryHash}`)
+  }
+
+  // Analytics caching
+  async cacheAnalytics(key: string, data: any, ttlSeconds = 300): Promise<boolean> {
+    return this.set(key, data, { prefix: "analytics", ttl: ttlSeconds })
+  }
+
+  async getCachedAnalytics(key: string): Promise<any> {
+    return this.get(key, "analytics")
+  }
+
+  // Webhook event caching
+  async cacheWebhookEvent(eventId: string, eventData: any, ttlSeconds = 3600): Promise<boolean> {
+    return this.set(`webhook_event:${eventId}`, eventData, { ttl: ttlSeconds })
+  }
+
+  async getCachedWebhookEvent(eventId: string): Promise<any> {
+    return this.get(`webhook_event:${eventId}`)
+  }
+
+  // List operations
+  async lpush(key: string, value: any, prefix?: string): Promise<number> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      return await redis.lpush(fullKey, JSON.stringify(value))
+    } catch (error) {
+      console.error("Redis LPUSH error:", error)
+      return 0
+    }
+  }
+
+  async lrange(key: string, start: number, stop: number, prefix?: string): Promise<any[]> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const values = await redis.lrange(fullKey, start, stop)
+      return values.map((v) => {
+        try {
+          return JSON.parse(v)
+        } catch {
+          return v
+        }
+      })
+    } catch (error) {
+      console.error("Redis LRANGE error:", error)
+      return []
+    }
+  }
+
+  async ltrim(key: string, start: number, stop: number, prefix?: string): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      await redis.ltrim(fullKey, start, stop)
+      return true
+    } catch (error) {
+      console.error("Redis LTRIM error:", error)
+      return false
+    }
+  }
+
+  // Hash operations
+  async hset(key: string, field: string, value: any, prefix?: string): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      await redis.hset(fullKey, { [field]: JSON.stringify(value) })
+      return true
+    } catch (error) {
+      console.error("Redis HSET error:", error)
+      return false
+    }
+  }
+
+  async hget(key: string, field: string, prefix?: string): Promise<any> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const value = await redis.hget(fullKey, field)
+      return value ? JSON.parse(value) : null
+    } catch (error) {
+      console.error("Redis HGET error:", error)
+      return null
+    }
+  }
+
+  async hgetall(key: string, prefix?: string): Promise<Record<string, any>> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const hash = await redis.hgetall(fullKey)
+      const result: Record<string, any> = {}
+
+      for (const [field, value] of Object.entries(hash)) {
+        try {
+          result[field] = JSON.parse(value as string)
+        } catch {
+          result[field] = value
+        }
+      }
+
+      return result
+    } catch (error) {
+      console.error("Redis HGETALL error:", error)
+      return {}
+    }
+  }
+
+  // Set operations
+  async sadd(key: string, member: any, prefix?: string): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const result = await redis.sadd(fullKey, JSON.stringify(member))
+      return result > 0
+    } catch (error) {
+      console.error("Redis SADD error:", error)
+      return false
+    }
+  }
+
+  async smembers(key: string, prefix?: string): Promise<any[]> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const members = await redis.smembers(fullKey)
+      return members.map((m) => {
+        try {
+          return JSON.parse(m)
+        } catch {
+          return m
+        }
+      })
+    } catch (error) {
+      console.error("Redis SMEMBERS error:", error)
+      return []
+    }
+  }
+
+  async srem(key: string, member: any, prefix?: string): Promise<boolean> {
+    try {
+      const fullKey = this.getKey(key, prefix)
+      const result = await redis.srem(fullKey, JSON.stringify(member))
+      return result > 0
+    } catch (error) {
+      console.error("Redis SREM error:", error)
+      return false
+    }
+  }
+
+  // Utility methods
+  async keys(pattern: string): Promise<string[]> {
+    try {
+      return await redis.keys(pattern)
+    } catch (error) {
+      console.error("Redis KEYS error:", error)
+      return []
+    }
+  }
+
+  async flushdb(): Promise<boolean> {
+    try {
+      await redis.flushdb()
+      return true
+    } catch (error) {
+      console.error("Redis FLUSHDB error:", error)
+      return false
+    }
+  }
+
+  async ping(): Promise<boolean> {
+    try {
+      const result = await redis.ping()
+      return result === "PONG"
+    } catch (error) {
+      console.error("Redis PING error:", error)
+      return false
+    }
+  }
+
+  // Batch operations
   async mget(keys: string[], prefix?: string): Promise<(any | null)[]> {
     try {
-      const fullKeys = keys.map((key) => (prefix ? `${prefix}:${key}` : key))
-      const values = await this.redis.mget(...fullKeys)
-      return values.map((value) => (value ? JSON.parse(value as string) : null))
+      const fullKeys = keys.map((key) => this.getKey(key, prefix))
+      const values = await redis.mget(...fullKeys)
+      return values.map((v) => {
+        if (v === null) return null
+        try {
+          return JSON.parse(v)
+        } catch {
+          return v
+        }
+      })
     } catch (error) {
       console.error("Redis MGET error:", error)
       return keys.map(() => null)
     }
   }
 
-  async mset(keyValuePairs: Array<[string, any]>, options: CacheOptions = {}): Promise<boolean> {
+  async mset(keyValuePairs: Record<string, any>, options: CacheOptions = {}): Promise<boolean> {
     try {
-      const ttl = options.ttl || this.defaultTTL
-      const prefix = options.prefix
+      const pairs: Record<string, string> = {}
 
-      for (const [key, value] of keyValuePairs) {
-        const fullKey = prefix ? `${prefix}:${key}` : key
-        await this.redis.setex(fullKey, ttl, JSON.stringify(value))
+      for (const [key, value] of Object.entries(keyValuePairs)) {
+        const fullKey = this.getKey(key, options.prefix)
+        pairs[fullKey] = JSON.stringify(value)
       }
+
+      await redis.mset(pairs)
+
+      // Set TTL for each key if specified
+      if (options.ttl) {
+        const promises = Object.keys(pairs).map((key) => redis.expire(key, options.ttl!))
+        await Promise.all(promises)
+      }
+
       return true
     } catch (error) {
       console.error("Redis MSET error:", error)
@@ -164,74 +379,25 @@ export class RedisCache {
     }
   }
 
-  // Pattern-based operations
-  async deletePattern(pattern: string): Promise<number> {
-    try {
-      const keys = await this.redis.keys(pattern)
-      if (keys.length > 0) {
-        await this.redis.del(...keys)
-      }
-      return keys.length
-    } catch (error) {
-      console.error("Redis delete pattern error:", error)
-      return 0
-    }
-  }
-
   // Health check
-  async ping(): Promise<boolean> {
+  async healthCheck(): Promise<{ status: "healthy" | "unhealthy"; latency?: number; error?: string }> {
     try {
-      const result = await this.redis.ping()
-      return result === "PONG"
-    } catch (error) {
-      console.error("Redis ping error:", error)
-      return false
-    }
-  }
+      const start = Date.now()
+      await this.ping()
+      const latency = Date.now() - start
 
-  // Get cache statistics
-  async getStats(): Promise<{
-    connected: boolean
-    memory_usage?: string
-    total_keys?: number
-  }> {
-    try {
-      const connected = await this.ping()
-
-      if (!connected) {
-        return { connected: false }
-      }
-
-      // Note: Upstash Redis may not support all INFO commands
       return {
-        connected: true,
-        memory_usage: "N/A",
-        total_keys: 0,
+        status: "healthy",
+        latency,
       }
     } catch (error) {
-      console.error("Redis stats error:", error)
-      return { connected: false }
+      return {
+        status: "unhealthy",
+        error: error instanceof Error ? error.message : "Unknown error",
+      }
     }
   }
 }
 
-// Export singleton instance
 export const cache = new RedisCache()
-
-// Utility functions
-export async function withCache<T>(key: string, fetcher: () => Promise<T>, options: CacheOptions = {}): Promise<T> {
-  // Try to get from cache first
-  const cached = await cache.get<T>(key, options.prefix)
-  if (cached !== null) {
-    return cached
-  }
-
-  // If not in cache, fetch and cache the result
-  const result = await fetcher()
-  await cache.set(key, result, options)
-  return result
-}
-
-export async function invalidateCache(pattern: string): Promise<number> {
-  return cache.deletePattern(pattern)
-}
+export default cache
