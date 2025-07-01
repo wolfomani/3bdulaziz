@@ -41,24 +41,54 @@ body {
   color: hsl(var(--foreground));
   overflow-x: hidden;
   direction: rtl;
+  line-height: 1.6;
 }
 
-/* Custom scrollbar */
+/* تحسين الوصولية */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* تحسين التباين للوصولية */
+@media (prefers-contrast: high) {
+  :root {
+    --foreground: 0 0% 100%;
+    --background: 0 0% 0%;
+    --border: 0 0% 50%;
+  }
+}
+
+/* Custom scrollbar - محسن */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(239, 68, 68, 0.3);
-  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(249, 115, 22, 0.4));
+  border-radius: 4px;
+  transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(239, 68, 68, 0.5);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.6), rgba(249, 115, 22, 0.6));
+}
+
+/* Firefox scrollbar */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(239, 68, 68, 0.4) rgba(0, 0, 0, 0.1);
 }
 
 /* Hide scrollbar for mobile */
@@ -71,7 +101,7 @@ body {
   display: none;
 }
 
-/* Animations */
+/* Animations - محسنة للأداء */
 @keyframes float {
   0%,
   100% {
@@ -135,27 +165,33 @@ body {
   }
 }
 
+/* Animation classes */
 .animate-float {
   animation: float 3s ease-in-out infinite;
+  will-change: transform;
 }
 
 .animate-glow {
   animation: glow 2s ease-in-out infinite;
+  will-change: box-shadow;
 }
 
 .animate-fade-in-up {
   animation: fadeInUp 0.6s ease-out;
+  will-change: opacity, transform;
 }
 
 .animate-slide-in-right {
   animation: slideInRight 0.6s ease-out;
+  will-change: opacity, transform;
 }
 
 .animate-slide-in-left {
   animation: slideInLeft 0.6s ease-out;
+  will-change: opacity, transform;
 }
 
-/* Gradient text */
+/* Gradient text - محسن */
 .gradient-text {
   background: linear-gradient(135deg, #ef4444, #f97316, #ef4444);
   background-size: 200% 200%;
@@ -163,6 +199,7 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: gradient-shift 3s ease infinite;
+  will-change: background-position;
 }
 
 @keyframes gradient-shift {
@@ -187,6 +224,7 @@ body {
   border-radius: 50%;
   background-color: currentColor;
   animation: loading-bounce 1.4s ease-in-out infinite both;
+  will-change: transform, opacity;
 }
 
 .loading-dots div:nth-child(1) {
@@ -209,12 +247,13 @@ body {
   }
 }
 
-/* Particle effects */
+/* Particle effects - محسنة */
 .particle {
   position: absolute;
   pointer-events: none;
   border-radius: 50%;
   animation: particle-float 6s linear infinite;
+  will-change: transform, opacity;
 }
 
 @keyframes particle-float {
@@ -234,12 +273,12 @@ body {
   }
 }
 
-/* Smooth transitions */
+/* Smooth transitions - محسنة */
 * {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow,
     transform, filter, backdrop-filter;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  transition-duration: 200ms;
 }
 
 /* Custom utilities */
@@ -255,22 +294,44 @@ body {
   backdrop-filter: blur(20px);
 }
 
-/* Container queries support */
-@container (min-width: 640px) {
-  .container-sm\:flex {
-    display: flex;
-  }
-}
-
-/* Focus styles */
+/* Focus styles - محسنة للوصولية */
 .focus-visible\:ring-red-500:focus-visible {
   --tw-ring-color: rgb(239 68 68);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/* Skip to content link للوصولية */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+.skip-to-content:focus {
+  top: 6px;
 }
 
 /* Print styles */
 @media print {
   .no-print {
     display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .gradient-text {
+    -webkit-text-fill-color: black !important;
+    background: none !important;
   }
 }
 
@@ -282,8 +343,40 @@ body {
 
   .gradient-text {
     background-size: 100% 100%;
-    animation: none;
   }
+
+  /* تحسين الخط للشاشات الصغيرة */
+  body {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+}
+
+/* تحسين للشاشات الكبيرة */
+@media (min-width: 1920px) {
+  .container {
+    max-width: 1400px;
+  }
+}
+
+/* Dark mode improvements */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* Container queries support */
+@container (min-width: 640px) {
+  .container-sm\:flex {
+    display: flex;
+  }
+}
+
+/* Performance optimizations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* Accessibility improvements */
@@ -295,6 +388,32 @@ body {
   .animate-slide-in-left,
   .gradient-text,
   .particle {
-    animation: none;
+    animation: none !important;
+    transition: none !important;
   }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .gradient-text {
+    background: none;
+    -webkit-text-fill-color: white;
+    color: white;
+  }
+
+  button,
+  .button {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Focus indicators */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
