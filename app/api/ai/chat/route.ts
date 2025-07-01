@@ -1,145 +1,203 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateAIResponse, checkProvidersHealth } from "@/lib/ai-providers"
-import { AuthService } from "@/lib/auth"
-import DrXDatabase from "@/lib/database"
+
+interface ChatRequest {
+  message: string
+  settings: {
+    model: "together" | "groq"
+    temperature: number
+    maxTokens: number
+    enableThinking: boolean
+    enableSearch: boolean
+  }
+  history: Array<{
+    role: "user" | "assistant"
+    content: string
+  }>
+}
+
+// Together AI API call
+async function callTogetherAPI(messages: any[], settings: any) {
+  const response = await fetch("https://api.together.xyz/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.TOGETHER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+      messages,
+      temperature: settings.temperature,
+      max_tokens: settings.maxTokens,
+      stream: false,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Together API error: ${response.status} - ${errorText}`)
+  }
+
+  return response.json()
+}
+
+// Groq API call
+async function callGroqAPI(messages: any[], settings: any) {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "qwen-qwq-32b",
+      messages,
+      temperature: settings.temperature,
+      max_completion_tokens: settings.maxTokens,
+      top_p: 0.95,
+      stream: false,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Groq API error: ${response.status} - ${errorText}`)
+  }
+
+  return response.json()
+}
+
+// Create enhanced system prompt
+function createSystemPrompt(settings: any): string {
+  let prompt = `أنت drx3، مساعد ذكي متخصص في الذكاء الاصطناعي والبرمجة والتكنولوجيا.
+
+خصائصك:
+- خبير في Python، JavaScript، الذكاء الاصطناعي، والتعلم الآلي
+- تجيب باللغة العربية بشكل أساسي مع دعم الإنجليزية عند الحاجة
+- تقدم إجابات منظمة ومفصلة ومفيدة
+- تستخدم التنسيق المناسب (عناوين، قوائم، كود)
+- تشرح المفاهيم بطريقة واضحة ومنطقية
+
+إرشادات التنسيق:
+- استخدم العناوين (# ## ###) لتنظيم المحتوى
+- استخدم القوائم المرقمة والنقطية عند الحاجة
+- ضع الكود في صناديق مع تحديد اللغة
+- استخدم النص الغامق للنقاط المهمة
+- نظم الإجابة بشكل هرمي وواضح
+
+إرشادات المحتوى:
+- كن دقيقاً ومفيداً
+- قدم أمثلة عملية عند الحاجة
+- اشرح الخطوات بوضوح
+- اربط المفاهيم ببعضها البعض`
+
+  if (settings.enableThinking) {
+    prompt += "\n- فكر خطوة بخطوة قبل الإجابة وأظهر عملية التفكير"
+  }
+
+  if (settings.enableSearch) {
+    prompt += "\n- ابحث في معرفتك بعمق للحصول على أفضل إجابة شاملة"
+  }
+
+  return prompt
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from session
-    const token = request.cookies.get("auth_token")?.value
-    let user = null
+    const body: ChatRequest = await request.json()
+    const { message, settings, history } = body
 
-    if (token) {
-      const sessionResult = await AuthService.validateSession(token)
-      user = sessionResult?.user || null
-    }
-
-    const { message, conversationId, systemPrompt } = await request.json()
-
-    if (!message || typeof message !== "string") {
+    // Validate input
+    if (!message?.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
-    // Generate AI response
-    const startTime = Date.now()
-    const aiResponse = await generateAIResponse(message, {
-      userId: user?.id,
-      conversationId,
-      systemPrompt,
-    })
-
-    // Save conversation if user is logged in
-    let conversation = null
-    if (user) {
-      // Create or get conversation
-      if (conversationId) {
-        conversation = await DrXDatabase.getConversation(conversationId)
-      } else {
-        conversation = await DrXDatabase.createConversation({
-          user_id: user.id,
-          title: message.slice(0, 50) + (message.length > 50 ? "..." : ""),
-          metadata: {
-            provider: aiResponse.provider,
-            model: aiResponse.model,
-          },
-        })
-      }
-
-      // Save messages
-      await DrXDatabase.createMessage({
-        conversation_id: conversation.id,
+    // Prepare messages for API
+    const messages = [
+      {
+        role: "system",
+        content: createSystemPrompt(settings),
+      },
+      // Add recent history for context
+      ...history.slice(-6).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      {
         role: "user",
         content: message,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      })
+      },
+    ]
 
-      await DrXDatabase.createMessage({
-        conversation_id: conversation.id,
-        role: "assistant",
-        content: aiResponse.content,
-        metadata: {
-          provider: aiResponse.provider,
-          model: aiResponse.model,
-          tokens_used: aiResponse.tokensUsed,
-          cost: aiResponse.cost,
-          confidence: aiResponse.confidence,
-          processing_time: aiResponse.processingTime,
-        },
-      })
+    const startTime = Date.now()
+    let response
+    let actualModel = settings.model
 
-      // Log usage analytics
-      await DrXDatabase.logUsage({
-        session_id: user.id,
-        provider: aiResponse.provider,
-        model: aiResponse.model,
-        tokens_used: aiResponse.tokensUsed,
-        processing_time_ms: Date.now() - startTime,
-        success: true,
-        metadata: {
-          conversation_id: conversation.id,
-          user_id: user.id,
-          cached: aiResponse.cached,
-        },
-      })
+    try {
+      // Call the selected model
+      if (settings.model === "together") {
+        response = await callTogetherAPI(messages, settings)
+        actualModel = "Together AI (DeepSeek-R1)"
+      } else {
+        response = await callGroqAPI(messages, settings)
+        actualModel = "Groq (Qwen-QwQ-32B)"
+      }
+    } catch (error) {
+      console.error(`Primary model (${settings.model}) failed:`, error)
+
+      // Try fallback model
+      try {
+        if (settings.model === "together") {
+          response = await callGroqAPI(messages, settings)
+          actualModel = "Groq (Qwen-QwQ-32B) - Fallback"
+        } else {
+          response = await callTogetherAPI(messages, settings)
+          actualModel = "Together AI (DeepSeek-R1) - Fallback"
+        }
+      } catch (fallbackError) {
+        console.error("Fallback model also failed:", fallbackError)
+        return NextResponse.json(
+          {
+            content: "عذراً، أواجه مشكلة تقنية مؤقتة. يرجى المحاولة مرة أخرى.",
+            model: "error",
+            tokens: 0,
+            processingTime: Date.now() - startTime,
+          },
+          { status: 500 },
+        )
+      }
     }
 
+    const processingTime = Date.now() - startTime
+    const content = response.choices[0]?.message?.content || "عذراً، لم أتمكن من إنتاج رد مناسب."
+
     return NextResponse.json({
-      success: true,
-      response: aiResponse.content,
-      metadata: {
-        provider: aiResponse.provider,
-        model: aiResponse.model,
-        tokensUsed: aiResponse.tokensUsed,
-        cost: aiResponse.cost,
-        confidence: aiResponse.confidence,
-        processingTime: aiResponse.processingTime,
-        cached: aiResponse.cached,
-        conversationId: conversation?.id,
-      },
+      content,
+      model: actualModel,
+      tokens: response.usage?.total_tokens || Math.floor(content.length / 4),
+      processingTime,
     })
   } catch (error) {
     console.error("Chat API error:", error)
-
-    // Log failed usage
-    const token = request.cookies.get("auth_token")?.value
-    if (token) {
-      const sessionResult = await AuthService.validateSession(token)
-      if (sessionResult?.user) {
-        await DrXDatabase.logUsage({
-          session_id: sessionResult.user.id,
-          provider: "unknown",
-          model: "unknown",
-          tokens_used: 0,
-          processing_time_ms: 0,
-          success: false,
-          error_message: error instanceof Error ? error.message : "Unknown error",
-          metadata: {},
-        })
-      }
-    }
-
     return NextResponse.json(
       {
-        success: false,
-        error: error instanceof Error ? error.message : "Internal server error",
+        content: "حدث خطأ في معالجة طلبك. يرجى المحاولة مرة أخرى.",
+        model: "error",
+        tokens: 0,
+        processingTime: 0,
       },
       { status: 500 },
     )
   }
 }
 
+// Health check endpoint
 export async function GET() {
-  try {
-    const health = await checkProvidersHealth()
-
-    return NextResponse.json({
-      success: true,
-      providers: health,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: "Health check failed" }, { status: 500 })
-  }
+  return NextResponse.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    models: {
+      together: !!process.env.TOGETHER_API_KEY,
+      groq: !!process.env.GROQ_API_KEY,
+    },
+  })
 }
