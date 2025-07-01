@@ -7,68 +7,49 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { scenario = "basic", message = "Test webhook from Dr X API" } = body
+    const { url } = await request.json()
 
-    // Create test webhook event
-    const webhookEvent = {
-      id: uuidv4(),
-      type: `test.${scenario}`,
+    if (!url) {
+      return NextResponse.json({ success: false, message: "رابط مطلوب" }, { status: 400 })
+    }
+
+    const testPayload = {
+      event: "test",
       timestamp: new Date().toISOString(),
-      source: "test",
+      source: "drx3-api",
       data: {
-        scenario,
-        message,
-        test_data: generateTestData(scenario),
-      },
-      metadata: {
-        userAgent: request.headers.get("user-agent") || "unknown",
-        origin: request.headers.get("origin") || "direct",
-        test: true,
+        message: "This is a test webhook from DRX3 API",
+        user: "system",
+        test_id: Math.random().toString(36).substring(7),
       },
     }
 
-    // Log the test event
-    globalWebhookLogger.log(webhookEvent)
-
-    // Forward to webhook.site for monitoring
-    try {
-      const webhookHandler = new WebhookHandler(webhookConfigs.webhookSite)
-      await webhookHandler.send({
-        source: "drx3-test",
-        scenario,
-        message,
-        event_id: webhookEvent.id,
-        timestamp: webhookEvent.timestamp,
-        test_data: webhookEvent.data.test_data,
-      })
-    } catch (forwardError) {
-      console.warn("Failed to forward test webhook:", forwardError)
-    }
-
-    console.log(`🧪 Test webhook sent: ${scenario}`)
-
-    return NextResponse.json({
-      success: true,
-      message: "Test webhook sent successfully",
-      event: {
-        id: webhookEvent.id,
-        type: webhookEvent.type,
-        scenario,
-        timestamp: webhookEvent.timestamp,
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "DRX3-Webhook-Tester/1.0",
+        "X-Webhook-Source": "drx3-api",
       },
-      forwarded_to: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+      body: JSON.stringify(testPayload),
     })
+
+    if (response.ok) {
+      return NextResponse.json({
+        success: true,
+        message: "تم إرسال webhook بنجاح",
+        status: response.status,
+        response: await response.text(),
+      })
+    } else {
+      return NextResponse.json({
+        success: false,
+        message: `فشل في إرسال webhook: ${response.status} ${response.statusText}`,
+      })
+    }
   } catch (error) {
     console.error("Test webhook error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to send test webhook",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "خطأ في إرسال webhook" }, { status: 500 })
   }
 }
 

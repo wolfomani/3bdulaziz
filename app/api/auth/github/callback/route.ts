@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { AuthService } from "@/lib/auth"
+import { handleGitHubCallback } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,43 +8,29 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get("error")
 
     if (error) {
-      console.error("GitHub OAuth error:", error)
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/auth?error=github_error`,
-      )
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/auth?error=github_error`)
     }
 
     if (!code) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/auth?error=no_code`,
-      )
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/auth?error=no_code`)
     }
 
-    const result = await AuthService.handleGitHubCallback(code)
+    const { user, token } = await handleGitHubCallback(code)
 
-    if (!result.success || !result.session) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/auth?error=auth_failed`,
-      )
-    }
+    // Set secure cookie
+    const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard`)
 
-    // Set auth cookie
-    const response = NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/dashboard`,
-    )
-    response.cookies.set("auth_token", result.session.token, {
+    response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/",
     })
 
     return response
   } catch (error) {
     console.error("GitHub callback error:", error)
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL || "https://v0-drx3apipage2-git-main-balqees0alalawi-gmailcoms-projects.vercel.app"}/auth?error=server_error`,
-    )
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/auth?error=callback_failed`)
   }
 }

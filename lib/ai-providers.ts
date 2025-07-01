@@ -354,3 +354,22 @@ export async function checkProvidersHealth(): Promise<Record<string, boolean>> {
 
   return health
 }
+
+// AI Orchestrator for managing multiple providers
+export const aiOrchestrator = {
+  async generateResponse(query: string, options: any = {}) {
+    return generateAIResponse(query, options)
+  },
+
+  async streamResponse(query: string, options: any = {}) {
+    return generateStreamingResponse(query, options)
+  },
+
+  async getProviderHealth() {
+    return checkProvidersHealth()
+  },
+
+  analyzeQuery,
+  selectOptimalModel,
+  AI_PROVIDERS,
+}

@@ -387,5 +387,73 @@ export class WebhookHandler {
   }
 }
 
+// Global webhook logger instance
+export const globalWebhookLogger = {
+  async log(event: string, data: any) {
+    console.log(`[Webhook] ${event}:`, data)
+    // Store in database if needed
+    try {
+      await WebhookHandler.storeEvent({
+        type: event,
+        source: "custom",
+        payload: data,
+        headers: {},
+      })
+    } catch (error) {
+      console.error("Failed to log webhook event:", error)
+    }
+  },
+
+  async getRecentLogs(limit = 50) {
+    return WebhookHandler.getWebhookStats()
+  },
+}
+
+// Webhook utilities
+export const WebhookUtils = {
+  validateSignature: WebhookHandler.generateSignature,
+
+  async processEvent(type: string, payload: any, headers: Record<string, string>) {
+    if (type.startsWith("github")) {
+      return WebhookHandler.processGitHubWebhook(payload, headers)
+    } else if (type.startsWith("vercel")) {
+      return WebhookHandler.processVercelWebhook(payload, headers)
+    }
+    throw new Error(`Unsupported webhook type: ${type}`)
+  },
+
+  async retryFailed() {
+    return WebhookHandler.retryFailedWebhooks()
+  },
+}
+
+// Webhook configurations
+export const webhookConfigs = {
+  github: {
+    events: ["push", "pull_request", "issues", "star"],
+    secret: process.env.GITHUB_WEBHOOK_SECRET,
+    active: true,
+  },
+
+  vercel: {
+    events: ["deployment"],
+    secret: process.env.VERCEL_WEBHOOK_SECRET,
+    active: true,
+  },
+
+  async setup(name: string, url: string, events: string[]) {
+    return WebhookHandler.setupWebhook({
+      name,
+      url,
+      events,
+      active: true,
+    })
+  },
+
+  async test(webhookId: string) {
+    return WebhookHandler.testWebhook(webhookId)
+  },
+}
+
 // Export for use in API routes
 export default WebhookHandler

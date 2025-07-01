@@ -352,4 +352,6 @@ class DrXDatabase {
   }
 }
 
+// Export DrXDatabase as named export
+export { DrXDatabase }
 export default DrXDatabase

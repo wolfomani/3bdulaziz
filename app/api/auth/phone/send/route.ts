@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { sendPhoneVerification } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,23 +9,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "رقم الهاتف مطلوب" }, { status: 400 })
     }
 
-    // For demo purposes, we'll simulate SMS sending
-    // In production, you would integrate with Twilio or similar service
-    console.log(`Sending SMS to ${phone}`)
+    // Validate phone format (basic validation)
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/
+    if (!phoneRegex.test(phone)) {
+      return NextResponse.json({ success: false, message: "تنسيق رقم الهاتف غير صحيح" }, { status: 400 })
+    }
 
-    // Generate a random 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    const result = await sendPhoneVerification(phone)
 
-    // Store the code temporarily (in production, use Redis or database)
-    // For now, we'll just log it
-    console.log(`Verification code for ${phone}: ${code}`)
-
-    return NextResponse.json({
-      success: true,
-      message: "تم إرسال رمز التحقق بنجاح",
-    })
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: "تم إرسال رمز التحقق",
+        // Include code in development only
+        ...(process.env.NODE_ENV === "development" && { code: result.code }),
+      })
+    } else {
+      return NextResponse.json({ success: false, message: "فشل في إرسال رمز التحقق" }, { status: 500 })
+    }
   } catch (error) {
-    console.error("Send phone verification error:", error)
-    return NextResponse.json({ success: false, message: "حدث خطأ في إرسال رمز التحقق" }, { status: 500 })
+    console.error("Phone verification send error:", error)
+    return NextResponse.json({ success: false, message: "خطأ في الخادم" }, { status: 500 })
   }
 }

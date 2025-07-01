@@ -3,41 +3,43 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Bot, UserIcon, Loader2, Trash2, Home, Sparkles } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { Separator } from "@/components/ui/separator"
+import { Send, Bot, UserIcon, Loader2, ArrowLeft, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
+import { TypingIndicator } from "@/components/typing-indicator"
 
 interface Message {
   id: string
   role: "user" | "assistant"
   content: string
   timestamp: Date
+  provider?: string
   model?: string
+  tokensUsed?: number
 }
 
 interface ChatUser {
   id: string
-  name?: string
+  name: string
   avatar?: string
 }
 
 export default function ChatPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<ChatUser | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [user, setUser] = useState<ChatUser | null>(null)
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [isAuthLoading, setIsAuthLoading] = useState(true)
-
+  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
 
   useEffect(() => {
     checkAuth()
@@ -45,24 +47,21 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, isTyping])
 
   const checkAuth = async () => {
     try {
       const response = await fetch("/api/auth/me")
       const data = await response.json()
 
-      if (!data.success) {
+      if (data.authenticated) {
+        setUser(data.user)
+      } else {
         router.push("/auth")
-        return
       }
-
-      setUser(data.user)
     } catch (error) {
       console.error("Auth check error:", error)
       router.push("/auth")
-    } finally {
-      setIsAuthLoading(false)
     }
   }
 
@@ -70,7 +69,9 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const sendMessage = async () => {
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+
     if (!input.trim() || isLoading) return
 
     const userMessage: Message = {
@@ -83,25 +84,17 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
+    setIsTyping(true)
 
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-          conversationId,
+          message: userMessage.content,
+          conversationId: "current-chat", // In a real app, this would be dynamic
         }),
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to get response")
-      }
 
       const data = await response.json()
 
@@ -109,91 +102,63 @@ export default function ChatPage() {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: data.message,
+          content: data.response.content,
           timestamp: new Date(),
-          model: data.model,
+          provider: data.response.provider,
+          model: data.response.model,
+          tokensUsed: data.response.tokensUsed,
         }
 
         setMessages((prev) => [...prev, assistantMessage])
-
-        if (data.conversationId) {
-          setConversationId(data.conversationId)
-        }
       } else {
-        throw new Error(data.message || "Failed to get response")
+        toast.error(data.message || "حدث خطأ في الإرسال")
       }
     } catch (error) {
       console.error("Send message error:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "عذراً، حدث خطأ أثناء معالجة رسالتك. يرجى المحاولة مرة أخرى.",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
+      toast.error("حدث خطأ في الاتصال")
     } finally {
       setIsLoading(false)
+      setIsTyping(false)
     }
   }
 
   const clearChat = () => {
     setMessages([])
-    setConversationId(null)
+    toast.success("تم مسح المحادثة")
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  if (isAuthLoading) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-red-950/20 to-black flex items-center justify-center">
-        <div className="text-white flex items-center gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          جاري التحميل...
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-red-950/20 to-black flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="text-2xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent"
-              >
-                عبد العزيز الحمداني
-              </Link>
-              <Badge className="bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-300 border-red-500/30">
-                <Bot className="w-3 h-3 ml-1" />
-                مساعد ذكي
-              </Badge>
+            <div className="flex items-center space-x-4 rtl:space-x-reverse">
+              <Button onClick={() => router.push("/dashboard")} variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                العودة
+              </Button>
+              <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                <Bot className="w-8 h-8 text-blue-600" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">المساعد الذكي</h1>
+                  <p className="text-sm text-gray-500">مدعوم بـ Groq و Together AI</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent">
-                  <Home className="w-4 h-4 ml-2" />
-                  لوحة التحكم
-                </Button>
-              </Link>
-              <Button
-                onClick={clearChat}
-                variant="outline"
-                className="border-white/30 text-white hover:bg-white/10 bg-transparent"
-              >
-                <Trash2 className="w-4 h-4 ml-2" />
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                {messages.length} رسالة
+              </Badge>
+              <Button onClick={clearChat} variant="outline" size="sm">
                 مسح المحادثة
               </Button>
             </div>
@@ -201,153 +166,123 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Chat Container */}
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        {/* Messages */}
-        <Card className="flex-1 bg-white/5 backdrop-blur-sm border-white/10 mb-4">
-          <CardContent className="p-0 h-full">
-            <ScrollArea className="h-[calc(100vh-200px)] p-4">
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center">
-                    <Sparkles className="w-8 h-8 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-2">مرحباً {user.name || "بك"}!</h3>
-                    <p className="text-gray-400 max-w-md">
-                      أنا مساعدك الذكي. يمكنني مساعدتك في الإجابة على أسئلتك، حل المشاكل، أو مجرد الدردشة. اسأل أي شيء
-                      تريد!
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <Button
-                      onClick={() => setInput("ما هو الذكاء الاصطناعي؟")}
-                      variant="outline"
-                      size="sm"
-                      className="border-white/30 text-white hover:bg-white/10 bg-transparent"
-                    >
-                      ما هو الذكاء الاصطناعي؟
-                    </Button>
-                    <Button
-                      onClick={() => setInput("كيف يمكنني تعلم البرمجة؟")}
-                      variant="outline"
-                      size="sm"
-                      className="border-white/30 text-white hover:bg-white/10 bg-transparent"
-                    >
-                      كيف أتعلم البرمجة؟
-                    </Button>
-                    <Button
-                      onClick={() => setInput("اكتب لي قصيدة قصيرة")}
-                      variant="outline"
-                      size="sm"
-                      className="border-white/30 text-white hover:bg-white/10 bg-transparent"
-                    >
-                      اكتب قصيدة
-                    </Button>
-                  </div>
+      {/* Chat Area */}
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="h-[calc(100vh-200px)] flex flex-col">
+          {/* Messages */}
+          <ScrollArea className="flex-1 p-4">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-blue-600" />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      {message.role === "assistant" && (
-                        <Avatar className="w-8 h-8 mt-1">
-                          <AvatarFallback className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-sm">
-                            <Bot className="w-4 h-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-
-                      <div
-                        className={`max-w-[80%] rounded-lg p-3 ${
-                          message.role === "user"
-                            ? "bg-gradient-to-r from-red-600 to-orange-500 text-white"
-                            : "bg-white/10 text-white border border-white/20"
-                        }`}
-                      >
-                        {message.role === "assistant" ? (
-                          <MarkdownRenderer content={message.content} />
-                        ) : (
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                        )}
-
-                        <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                          <span>
-                            {message.timestamp.toLocaleTimeString("ar-SA", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                          {message.model && (
-                            <Badge className="bg-white/20 text-white border-0 text-xs">{message.model}</Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {message.role === "user" && (
-                        <Avatar className="w-8 h-8 mt-1">
-                          <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm">
-                            <UserIcon className="w-4 h-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                  ))}
-
-                  {isLoading && (
-                    <div className="flex gap-3 justify-start">
-                      <Avatar className="w-8 h-8 mt-1">
-                        <AvatarFallback className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-sm">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">مرحباً {user.name}!</h3>
+                  <p className="text-gray-500 max-w-md">
+                    أنا مساعدك الذكي. يمكنني مساعدتك في الإجابة على أسئلتك، كتابة النصوص، البرمجة، والكثير من المهام
+                    الأخرى. ما الذي تود معرفته؟
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex items-start space-x-3 rtl:space-x-reverse ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    {message.role === "assistant" && (
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="bg-blue-100 text-blue-600">
                           <Bot className="w-4 h-4" />
                         </AvatarFallback>
                       </Avatar>
-                      <div className="bg-white/10 text-white border border-white/20 rounded-lg p-3">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>جاري الكتابة...</span>
-                        </div>
+                    )}
+
+                    <div
+                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                        message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+                      }`}
+                    >
+                      {message.role === "assistant" ? (
+                        <MarkdownRenderer content={message.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )}
+
+                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                        <span>
+                          {message.timestamp.toLocaleTimeString("ar-SA", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {message.provider && (
+                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <Badge variant="outline" className="text-xs">
+                              {message.provider}
+                            </Badge>
+                            {message.tokensUsed && <span>{message.tokensUsed} رمز</span>}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                    {message.role === "user" && (
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                        <AvatarFallback className="bg-gray-100 text-gray-600">
+                          <UserIcon className="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                ))}
 
-        {/* Input */}
-        <Card className="bg-white/5 backdrop-blur-sm border-white/10">
-          <CardContent className="p-4">
-            <div className="flex gap-2">
+                {isTyping && (
+                  <div className="flex items-start space-x-3 rtl:space-x-reverse">
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                        <Bot className="w-4 h-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="bg-gray-100 rounded-lg px-4 py-2">
+                      <TypingIndicator />
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </ScrollArea>
+
+          <Separator />
+
+          {/* Input Form */}
+          <form onSubmit={sendMessage} className="p-4">
+            <div className="flex space-x-2 rtl:space-x-reverse">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
                 placeholder="اكتب رسالتك هنا..."
-                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                 disabled={isLoading}
+                className="flex-1"
+                maxLength={2000}
               />
-              <Button
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading}
-                className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600"
-              >
+              <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
             </div>
-            <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
-              <span>اضغط Enter للإرسال</span>
+            <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
               <span>{input.length}/2000</span>
+              <span>اضغط Enter للإرسال</span>
             </div>
-          </CardContent>
+          </form>
         </Card>
-      </div>
+      </main>
     </div>
   )
 }

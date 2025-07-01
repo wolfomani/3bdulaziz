@@ -1,48 +1,32 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { AuthService } from "@/lib/auth"
+import { verifyToken } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("auth_token")?.value
 
     if (!token) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "غير مصرح",
-          user: null,
-        },
-        { status: 200 },
-      ) // Return 200 instead of 401 to avoid error
+      return NextResponse.json({ error: "غير مصرح", authenticated: false }, { status: 401 })
     }
 
-    const result = await AuthService.validateSession(token)
+    const user = await verifyToken(token)
 
-    if (!result) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "جلسة غير صالحة",
-          user: null,
-        },
-        { status: 200 },
-      )
+    if (!user) {
+      return NextResponse.json({ error: "رمز غير صالح", authenticated: false }, { status: 401 })
     }
 
     return NextResponse.json({
-      success: true,
-      user: result.user,
-      message: "تم العثور على المستخدم",
+      authenticated: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        provider: user.provider,
+      },
     })
   } catch (error) {
-    console.error("Get user error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "حدث خطأ في الخادم",
-        user: null,
-      },
-      { status: 200 },
-    )
+    console.error("Auth check error:", error)
+    return NextResponse.json({ error: "خطأ في الخادم", authenticated: false }, { status: 500 })
   }
 }
