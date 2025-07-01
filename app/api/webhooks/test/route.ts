@@ -1,59 +1,63 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { WebhookHandler, globalWebhookLogger } from "@/lib/webhook-handler"
+import { WebhookHandler, globalWebhookLogger, webhookConfigs } from "@/lib/webhook-handler"
 import { v4 as uuidv4 } from "uuid"
+
+// Force dynamic rendering to avoid build errors
+export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { scenario = "basic", message = "Test webhook", data = {} } = body
+    const { scenario = "basic", message = "Test webhook from Dr X API" } = body
 
     // Create test webhook event
-    const testEvent = {
+    const webhookEvent = {
       id: uuidv4(),
       type: `test.${scenario}`,
       timestamp: new Date().toISOString(),
       source: "test",
       data: {
-        message,
         scenario,
-        ...data,
-        test_metadata: {
-          user_agent: request.headers.get("user-agent"),
-          timestamp: new Date().toISOString(),
-          random_id: Math.random().toString(36).substring(7),
-        },
+        message,
+        test_data: generateTestData(scenario),
       },
       metadata: {
+        userAgent: request.headers.get("user-agent") || "unknown",
+        origin: request.headers.get("origin") || "direct",
         test: true,
-        scenario,
-        ip: request.headers.get("x-forwarded-for") || "unknown",
       },
     }
 
     // Log the test event
-    globalWebhookLogger.log(testEvent)
+    globalWebhookLogger.log(webhookEvent)
 
-    // Send to webhook.site for monitoring
-    const webhookHandler = new WebhookHandler({
-      url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-      retryAttempts: 2,
-      timeout: 5000,
-    })
+    // Forward to webhook.site for monitoring
+    try {
+      const webhookHandler = new WebhookHandler(webhookConfigs.webhookSite)
+      await webhookHandler.send({
+        source: "drx3-test",
+        scenario,
+        message,
+        event_id: webhookEvent.id,
+        timestamp: webhookEvent.timestamp,
+        test_data: webhookEvent.data.test_data,
+      })
+    } catch (forwardError) {
+      console.warn("Failed to forward test webhook:", forwardError)
+    }
 
-    const success = await webhookHandler.send({
-      test_type: scenario,
-      message,
-      event_id: testEvent.id,
-      timestamp: testEvent.timestamp,
-      payload: testEvent.data,
-    })
+    console.log(`🧪 Test webhook sent: ${scenario}`)
 
     return NextResponse.json({
       success: true,
       message: "Test webhook sent successfully",
-      event: testEvent,
-      forwarded: success,
-      webhook_site: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+      event: {
+        id: webhookEvent.id,
+        type: webhookEvent.type,
+        scenario,
+        timestamp: webhookEvent.timestamp,
+      },
+      forwarded_to: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
     })
   } catch (error) {
     console.error("Test webhook error:", error)
@@ -76,78 +80,72 @@ export async function GET(request: NextRequest) {
     // Predefined test scenarios
     const scenarios = {
       ping: {
-        message: "Ping test from Dr X API",
-        data: { zen: "Practicality beats purity." },
+        message: "Ping test from Dr X webhook system",
+        data: { status: "active", timestamp: new Date().toISOString() },
       },
       github_push: {
         message: "Simulated GitHub push event",
         data: {
-          ref: "refs/heads/main",
-          commits: [
-            {
-              id: "abc123",
-              message: "Test commit",
-              author: { name: "Dr X", email: "drx@example.com" },
-            },
-          ],
-          repository: { name: "drx3apipage2", full_name: "wolfomani/3bdulaziz" },
+          repository: "wolfomani/3bdulaziz",
+          branch: "main",
+          commits: 3,
+          pusher: "wolfomani",
         },
       },
       vercel_deployment: {
         message: "Simulated Vercel deployment event",
         data: {
           deployment: {
-            id: "dpl_test123",
-            url: "drx3-test.vercel.app",
+            id: "dpl_test_123",
+            url: "3bdulaziz-test.vercel.app",
             state: "READY",
           },
-          project: { name: "drx3apipage2" },
+          project: { name: "3bdulaziz" },
         },
       },
       error_test: {
-        message: "Error simulation test",
-        data: { error: "Simulated error for testing" },
+        message: "Test error handling",
+        data: { error: "Simulated error for testing", code: 500 },
       },
     }
 
     const testData = scenarios[scenario as keyof typeof scenarios] || scenarios.ping
 
-    // Create and send test webhook
-    const testEvent = {
+    // Create and log test event
+    const webhookEvent = {
       id: uuidv4(),
       type: `test.${scenario}`,
       timestamp: new Date().toISOString(),
       source: "test",
       data: testData,
       metadata: {
+        userAgent: request.headers.get("user-agent") || "unknown",
         test: true,
         scenario,
-        triggered_by: "GET_request",
       },
     }
 
-    globalWebhookLogger.log(testEvent)
+    globalWebhookLogger.log(webhookEvent)
 
     // Send to webhook.site
-    const webhookHandler = new WebhookHandler({
-      url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-      retryAttempts: 1,
-      timeout: 3000,
-    })
-
-    const success = await webhookHandler.send({
-      test_scenario: scenario,
-      event_id: testEvent.id,
-      timestamp: testEvent.timestamp,
-      ...testData,
-    })
+    try {
+      const webhookHandler = new WebhookHandler(webhookConfigs.webhookSite)
+      await webhookHandler.send({
+        source: "drx3-test-get",
+        scenario,
+        event_id: webhookEvent.id,
+        ...testData,
+      })
+    } catch (forwardError) {
+      console.warn("Failed to forward GET test webhook:", forwardError)
+    }
 
     return NextResponse.json({
       success: true,
       message: `Test scenario '${scenario}' executed`,
-      event: testEvent,
-      forwarded: success,
+      event: webhookEvent,
       available_scenarios: Object.keys(scenarios),
+      usage: "GET /api/webhooks/test?scenario=ping",
     })
   } catch (error) {
     console.error("GET test webhook error:", error)
@@ -159,5 +157,77 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 },
     )
+  }
+}
+
+function generateTestData(scenario: string) {
+  const baseData = {
+    timestamp: new Date().toISOString(),
+    test_id: uuidv4(),
+    environment: "test",
+  }
+
+  switch (scenario) {
+    case "github_push":
+      return {
+        ...baseData,
+        repository: "wolfomani/3bdulaziz",
+        branch: "main",
+        commits: [
+          {
+            id: "abc123",
+            message: "Test commit 1",
+            author: "wolfomani",
+          },
+          {
+            id: "def456",
+            message: "Test commit 2",
+            author: "wolfomani",
+          },
+        ],
+      }
+
+    case "vercel_deployment":
+      return {
+        ...baseData,
+        deployment: {
+          id: `dpl_${Date.now()}`,
+          url: `3bdulaziz-${Date.now()}.vercel.app`,
+          state: "READY",
+          created_at: new Date().toISOString(),
+        },
+        project: {
+          name: "3bdulaziz",
+          id: "prj_test_123",
+        },
+      }
+
+    case "error_simulation":
+      return {
+        ...baseData,
+        error: {
+          message: "Simulated webhook processing error",
+          code: "WEBHOOK_TEST_ERROR",
+          stack: "Error: Test error\n    at testFunction (test.js:1:1)",
+        },
+      }
+
+    case "performance_test":
+      return {
+        ...baseData,
+        metrics: {
+          processing_time: Math.random() * 1000,
+          memory_usage: Math.random() * 100,
+          cpu_usage: Math.random() * 50,
+        },
+        load_test: true,
+      }
+
+    default:
+      return {
+        ...baseData,
+        scenario,
+        message: "Basic test webhook data",
+      }
   }
 }
