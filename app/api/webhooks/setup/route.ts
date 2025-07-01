@@ -2,164 +2,265 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   const setupInstructions = {
-    github_webhook: {
-      title: "إعداد GitHub Webhook",
+    title: "Dr X Webhook Setup Guide",
+    description: "Complete guide to setting up webhooks for the Dr X platform",
+
+    endpoints: {
+      main: {
+        url: "https://3bdulaziz.vercel.app/api/webhooks",
+        description: "Main webhook endpoint - handles all webhook types",
+        methods: ["POST", "GET"],
+      },
+      github: {
+        url: "https://3bdulaziz.vercel.app/api/webhooks/github",
+        description: "GitHub-specific webhook endpoint",
+        methods: ["POST"],
+      },
+      vercel: {
+        url: "https://3bdulaziz.vercel.app/api/webhooks/vercel",
+        description: "Vercel deployment webhook endpoint",
+        methods: ["POST"],
+      },
+      test: {
+        url: "https://3bdulaziz.vercel.app/api/webhooks/test",
+        description: "Test webhook endpoint",
+        methods: ["POST", "GET"],
+      },
+    },
+
+    github_setup: {
+      title: "GitHub Webhook Setup",
       steps: [
         {
           step: 1,
-          title: "انتقل إلى إعدادات المستودع",
-          description: "اذهب إلى https://github.com/wolfomani/3bdulaziz/settings/hooks",
+          title: "Navigate to Repository Settings",
+          description: "Go to your GitHub repository → Settings → Webhooks",
           url: "https://github.com/wolfomani/3bdulaziz/settings/hooks",
         },
         {
           step: 2,
-          title: "أضف webhook جديد",
-          description: "انقر على 'Add webhook'",
+          title: "Add New Webhook",
+          description: "Click 'Add webhook' button",
         },
         {
           step: 3,
-          title: "تكوين الـ webhook",
-          configuration: {
+          title: "Configure Webhook",
+          description: "Fill in the webhook configuration",
+          config: {
             payload_url: "https://3bdulaziz.vercel.app/api/webhooks/github",
             content_type: "application/json",
             secret: "drx3rx3skabcdef1984767850aregiskpqbcdef1234567890",
-            events: ["push", "pull_request", "issues", "release", "star", "fork"],
+            events: ["push", "pull_request", "issues", "release", "star"],
             active: true,
           },
         },
         {
           step: 4,
-          title: "اختبار الـ webhook",
-          description: "انقر على 'Test webhook' للتأكد من عمله",
+          title: "Test the Webhook",
+          description: "GitHub will send a ping event to test the webhook",
         },
       ],
-      monitoring: {
-        webhook_site: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-        github_deliveries: "https://github.com/wolfomani/3bdulaziz/settings/hooks",
-        api_events: "https://3bdulaziz.vercel.app/api/webhooks/events",
-      },
+      curl_example: `curl -X POST https://api.github.com/repos/wolfomani/3bdulaziz/hooks \\
+  -H "Authorization: token YOUR_GITHUB_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "web",
+    "active": true,
+    "events": ["push", "pull_request", "issues"],
+    "config": {
+      "url": "https://3bdulaziz.vercel.app/api/webhooks/github",
+      "content_type": "json",
+      "secret": "drx3rx3skabcdef1984767850aregiskpqbcdef1234567890"
+    }
+  }'`,
     },
-    vercel_webhook: {
-      title: "إعداد Vercel Deploy Hook",
+
+    vercel_setup: {
+      title: "Vercel Deploy Hook Setup",
       steps: [
         {
           step: 1,
-          title: "انتقل إلى إعدادات المشروع في Vercel",
-          description: "اذهب إلى https://vercel.com/wolfomani/3bdulaziz/settings/git",
+          title: "Access Project Settings",
+          description: "Go to Vercel Dashboard → Your Project → Settings → Git",
         },
         {
           step: 2,
-          title: "أضف Deploy Hook",
-          description: "في قسم Deploy Hooks، أضف hook جديد",
-          configuration: {
-            name: "DrX Auto Deploy",
+          title: "Create Deploy Hook",
+          description: "Scroll to 'Deploy Hooks' section and create a new hook",
+          config: {
+            name: "Dr X Webhook",
             branch: "main",
-            url: "سيتم إنشاؤه تلقائياً",
           },
         },
         {
           step: 3,
-          title: "أضف الـ URL إلى متغيرات البيئة",
-          description: "أضف VERCEL_DEPLOY_HOOK إلى متغيرات البيئة",
-          environment_variable: "VERCEL_DEPLOY_HOOK",
+          title: "Configure Webhook Notification",
+          description: "Add webhook notification URL",
+          webhook_url: "https://3bdulaziz.vercel.app/api/webhooks/vercel",
         },
       ],
-    },
-    testing: {
-      title: "اختبار النظام",
-      endpoints: {
-        test_webhook: {
-          url: "https://3bdulaziz.vercel.app/api/webhooks/test",
-          method: "POST",
-          example: {
-            message: "Test webhook",
-            type: "test.manual",
-            data: { user_id: "test_123" },
-          },
-        },
-        view_events: {
-          url: "https://3bdulaziz.vercel.app/api/webhooks/events",
-          method: "GET",
-          parameters: ["limit", "offset", "source", "type", "since", "until"],
-        },
-        view_stats: {
-          url: "https://3bdulaziz.vercel.app/api/webhooks/stats",
-          method: "GET",
-          parameters: ["period", "group_by"],
-        },
-      },
-      curl_examples: [
-        {
-          description: "اختبار webhook",
-          command: `curl -X POST https://3bdulaziz.vercel.app/api/webhooks/test \\
+      curl_example: `# Trigger deployment
+curl -X POST 'YOUR_VERCEL_DEPLOY_HOOK_URL'
+
+# Or with custom webhook notification
+curl -X POST 'YOUR_VERCEL_DEPLOY_HOOK_URL' \\
   -H "Content-Type: application/json" \\
-  -d '{"message":"Test from terminal","type":"test.curl"}'`,
-        },
-        {
-          description: "عرض الأحداث الأخيرة",
-          command: "curl https://3bdulaziz.vercel.app/api/webhooks/events?limit=10",
-        },
-        {
-          description: "عرض إحصائيات اليوم",
-          command: "curl https://3bdulaziz.vercel.app/api/webhooks/stats?period=24h&group_by=type",
-        },
-      ],
+  -d '{"webhook": "https://3bdulaziz.vercel.app/api/webhooks/vercel"}'`,
     },
-    troubleshooting: {
-      title: "حل المشاكل",
-      common_issues: [
+
+    testing: {
+      title: "Testing Your Webhooks",
+      methods: [
         {
-          issue: "Webhook لا يصل",
-          solutions: ["تأكد من صحة الـ URL", "تحقق من إعدادات الشبكة والـ firewall", "تأكد من أن الخدمة تعمل"],
-        },
-        {
-          issue: "خطأ في التوقيع",
-          solutions: [
-            "تأكد من صحة الـ secret",
-            "تحقق من تطابق الـ secret في GitHub والتطبيق",
-            "تأكد من استخدام SHA256",
+          name: "Test Endpoint",
+          description: "Use the built-in test endpoint",
+          examples: [
+            {
+              title: "Basic Test",
+              curl: `curl -X POST https://3bdulaziz.vercel.app/api/webhooks/test \\
+  -H "Content-Type: application/json" \\
+  -d '{"message": "Hello from Dr X!"}'`,
+            },
+            {
+              title: "GitHub Push Simulation",
+              curl: `curl -X GET "https://3bdulaziz.vercel.app/api/webhooks/test?scenario=github_push"`,
+            },
+            {
+              title: "Vercel Deployment Simulation",
+              curl: `curl -X GET "https://3bdulaziz.vercel.app/api/webhooks/test?scenario=vercel_deployment"`,
+            },
           ],
         },
         {
-          issue: "الأحداث لا تُسجل",
-          solutions: ["تحقق من اتصال قاعدة البيانات", "تأكد من صحة متغيرات البيئة", "راجع logs الخادم"],
+          name: "Webhook.site Monitoring",
+          description: "Monitor webhook deliveries in real-time",
+          url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+        },
+        {
+          name: "Event Logs",
+          description: "Check webhook event logs via API",
+          examples: [
+            {
+              title: "Recent Events",
+              curl: `curl "https://3bdulaziz.vercel.app/api/webhooks/events?limit=10"`,
+            },
+            {
+              title: "GitHub Events Only",
+              curl: `curl "https://3bdulaziz.vercel.app/api/webhooks/events?source=github"`,
+            },
+            {
+              title: "Statistics",
+              curl: `curl "https://3bdulaziz.vercel.app/api/webhooks/stats?period=24h"`,
+            },
+          ],
         },
       ],
     },
+
+    troubleshooting: {
+      title: "Common Issues & Solutions",
+      issues: [
+        {
+          problem: "Webhook not receiving events",
+          solutions: [
+            "Check the webhook URL is correct and accessible",
+            "Verify the webhook is active in GitHub/Vercel settings",
+            "Check firewall and network settings",
+            "Test with the /api/webhooks/test endpoint",
+          ],
+        },
+        {
+          problem: "Signature verification failed",
+          solutions: [
+            "Ensure the secret matches exactly",
+            "Check for extra whitespace in the secret",
+            "Verify the signature algorithm (SHA-256 for GitHub)",
+            "Test without signature first, then add it back",
+          ],
+        },
+        {
+          problem: "Events not being processed",
+          solutions: [
+            "Check server logs for errors",
+            "Verify the webhook handler is running",
+            "Test with different event types",
+            "Check the event format matches expected structure",
+          ],
+        },
+        {
+          problem: "High latency or timeouts",
+          solutions: [
+            "Optimize webhook processing logic",
+            "Use async processing for heavy operations",
+            "Implement proper error handling",
+            "Consider using a queue for processing",
+          ],
+        },
+      ],
+    },
+
+    security: {
+      title: "Security Best Practices",
+      practices: [
+        {
+          title: "Use Webhook Secrets",
+          description: "Always use webhook secrets to verify payload authenticity",
+          secret: "drx3rx3skabcdef1984767850aregiskpqbcdef1234567890",
+        },
+        {
+          title: "Validate Signatures",
+          description: "Verify HMAC signatures for all incoming webhooks",
+        },
+        {
+          title: "Use HTTPS",
+          description: "Always use HTTPS endpoints for webhook URLs",
+        },
+        {
+          title: "Rate Limiting",
+          description: "Implement rate limiting to prevent abuse",
+        },
+        {
+          title: "Input Validation",
+          description: "Validate all incoming webhook payloads",
+        },
+        {
+          title: "Error Handling",
+          description: "Implement proper error handling and logging",
+        },
+      ],
+    },
+
     monitoring: {
-      title: "المراقبة والتتبع",
-      tools: {
-        webhook_site: {
+      title: "Monitoring & Analytics",
+      tools: [
+        {
+          name: "Webhook.site",
           url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-          description: "مراقبة الـ webhooks في الوقت الفعلي",
+          description: "Real-time webhook monitoring and debugging",
         },
-        api_dashboard: {
+        {
+          name: "Events API",
+          url: "https://3bdulaziz.vercel.app/api/webhooks/events",
+          description: "Query and filter webhook events",
+        },
+        {
+          name: "Statistics API",
+          url: "https://3bdulaziz.vercel.app/api/webhooks/stats",
+          description: "Webhook analytics and performance metrics",
+        },
+        {
+          name: "Management UI",
           url: "https://3bdulaziz.vercel.app/webhooks",
-          description: "لوحة تحكم إدارة الـ webhooks",
+          description: "Web interface for webhook management",
         },
-        github_deliveries: {
-          url: "https://github.com/wolfomani/3bdulaziz/settings/hooks",
-          description: "سجل تسليم GitHub webhooks",
-        },
-      },
+      ],
     },
   }
 
-  return NextResponse.json({
-    success: true,
-    message: "دليل إعداد نظام Webhooks",
-    setup_instructions: setupInstructions,
-    current_status: {
-      github_webhook_configured: true,
-      secret_configured: true,
-      monitoring_active: true,
-      endpoints_active: true,
-    },
-    quick_start: {
-      "1": "تأكد من إعداد GitHub webhook مع الـ secret الصحيح",
-      "2": "اختبر النظام باستخدام /api/webhooks/test",
-      "3": "راقب الأحداث على webhook.site",
-      "4": "استخدم /api/webhooks/events لعرض السجلات",
+  return NextResponse.json(setupInstructions, {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600", // Cache for 1 hour
     },
   })
 }

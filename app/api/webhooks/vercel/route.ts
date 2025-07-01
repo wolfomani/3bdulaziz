@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { globalWebhookLogger, WebhookHandler, webhookConfigs } from "@/lib/webhook-handler"
+import { WebhookHandler, globalWebhookLogger, WebhookUtils } from "@/lib/webhook-handler"
 import { v4 as uuidv4 } from "uuid"
 
 export async function POST(request: NextRequest) {
@@ -7,63 +7,71 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const headers = Object.fromEntries(request.headers.entries())
 
-    // Verify Vercel signature if configured
-    const signature = headers["x-vercel-signature"]
-    if (signature && process.env.VERCEL_WEBHOOK_SECRET) {
-      // Implement Vercel signature verification here if needed
-      console.log("Vercel signature verification not implemented yet")
+    // Verify Vercel signature if secret is provided
+    if (process.env.VERCEL_WEBHOOK_SECRET) {
+      const signature = headers["x-vercel-signature"]
+      const rawBody = JSON.stringify(body)
+
+      if (!signature || !WebhookUtils.validateSignature(rawBody, signature, process.env.VERCEL_WEBHOOK_SECRET)) {
+        console.warn("Invalid Vercel webhook signature")
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
+      }
+    }
+
+    // Extract Vercel event information
+    const deployment = body.deployment || {}
+    const project = body.project || {}
+    const team = body.team || {}
+
+    // Determine event type
+    let eventType = "vercel.deployment"
+    if (deployment.state) {
+      eventType = `vercel.deployment.${deployment.state.toLowerCase()}`
     }
 
     // Create webhook event
     const webhookEvent = {
       id: uuidv4(),
-      type: `vercel.${body.type || "deployment"}`,
+      type: eventType,
       timestamp: new Date().toISOString(),
       source: "vercel",
       data: body,
       metadata: {
-        userAgent: headers["user-agent"],
-        signature: signature || "none",
-        deployment: body.deployment,
-        project: body.project,
+        deployment_id: deployment.id,
+        deployment_url: deployment.url,
+        project_name: project.name,
+        team_name: team?.name,
+        state: deployment.state,
+        ...WebhookUtils.extractMetadata(request),
       },
     }
 
     // Log the event
     globalWebhookLogger.log(webhookEvent)
 
-    console.log(`▲ Vercel webhook received: ${body.type || "deployment"}`)
-
-    let processingResult: any = {}
-
-    // Process different Vercel events
-    switch (body.type) {
-      case "deployment.created":
-        processingResult = await handleDeploymentCreated(body)
-        break
-      case "deployment.succeeded":
-        processingResult = await handleDeploymentSucceeded(body)
-        break
-      case "deployment.failed":
-        processingResult = await handleDeploymentFailed(body)
-        break
-      case "deployment.canceled":
-        processingResult = await handleDeploymentCanceled(body)
-        break
-      default:
-        processingResult = await handleGenericVercelEvent(body)
-    }
+    // Process the Vercel webhook
+    const processingResult = await processVercelWebhook(webhookEvent)
 
     // Forward to webhook.site for monitoring
     try {
-      const webhookHandler = new WebhookHandler(webhookConfigs.webhookSite)
+      const webhookHandler = new WebhookHandler({
+        url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+        retryAttempts: 1,
+        timeout: 5000,
+      })
+
       await webhookHandler.send({
         source: "vercel",
-        event_type: body.type || "deployment",
+        event_type: eventType,
         deployment: {
-          url: body.deployment?.url,
-          state: body.deployment?.state,
-          project: body.project?.name,
+          id: deployment.id,
+          url: deployment.url,
+          state: deployment.state,
+          created_at: deployment.createdAt,
+        },
+        project: {
+          name: project.name,
+          id: project.id,
         },
         processing_result: processingResult,
         timestamp: webhookEvent.timestamp,
@@ -77,13 +85,15 @@ export async function POST(request: NextRequest) {
       message: "Vercel webhook processed successfully",
       event: {
         id: webhookEvent.id,
-        type: webhookEvent.type,
+        type: eventType,
+        deployment_url: deployment.url,
+        state: deployment.state,
         timestamp: webhookEvent.timestamp,
       },
       processing: processingResult,
     })
   } catch (error) {
-    console.error("Vercel webhook error:", error)
+    console.error("Vercel webhook handler error:", error)
     return NextResponse.json(
       {
         success: false,
@@ -95,124 +105,167 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleDeploymentCreated(payload: any) {
-  const deployment = payload.deployment
-  const project = payload.project
+async function processVercelWebhook(event: any) {
+  const { data } = event
+  const deployment = data.deployment || {}
+  const project = data.project || {}
 
-  console.log(`🚀 Deployment created: ${deployment?.url} (${project?.name})`)
+  console.log(`▲ Vercel Deployment: ${deployment.state} - ${deployment.url}`)
 
-  return {
-    success: true,
-    message: "Deployment created",
-    deployment: {
-      id: deployment?.id,
-      url: deployment?.url,
-      state: deployment?.state,
-      project: project?.name,
-      created_at: deployment?.createdAt,
-    },
+  switch (deployment.state) {
+    case "BUILDING":
+      console.log(`🔨 Building deployment for ${project.name}`)
+      return {
+        success: true,
+        message: "Deployment build started",
+        action: "build_started",
+        deployment_id: deployment.id,
+      }
+
+    case "READY":
+      console.log(`✅ Deployment ready: ${deployment.url}`)
+
+      // Perform post-deployment actions
+      await performPostDeploymentActions(deployment, project)
+
+      return {
+        success: true,
+        message: "Deployment completed successfully",
+        action: "deployment_ready",
+        deployment_url: deployment.url,
+        deployment_id: deployment.id,
+      }
+
+    case "ERROR":
+      console.error(`❌ Deployment failed for ${project.name}`)
+
+      // Handle deployment failure
+      await handleDeploymentFailure(deployment, project)
+
+      return {
+        success: false,
+        message: "Deployment failed",
+        action: "deployment_failed",
+        deployment_id: deployment.id,
+        error: deployment.error || "Unknown deployment error",
+      }
+
+    case "CANCELED":
+      console.log(`⏹️ Deployment canceled for ${project.name}`)
+      return {
+        success: true,
+        message: "Deployment was canceled",
+        action: "deployment_canceled",
+        deployment_id: deployment.id,
+      }
+
+    default:
+      console.log(`📦 Vercel deployment event: ${deployment.state}`)
+      return {
+        success: true,
+        message: `Deployment state: ${deployment.state}`,
+        action: "deployment_update",
+        state: deployment.state,
+        deployment_id: deployment.id,
+      }
   }
 }
 
-async function handleDeploymentSucceeded(payload: any) {
-  const deployment = payload.deployment
-  const project = payload.project
+async function performPostDeploymentActions(deployment: any, project: any) {
+  try {
+    console.log(`🚀 Performing post-deployment actions for ${deployment.url}`)
 
-  console.log(`✅ Deployment succeeded: ${deployment?.url} (${project?.name})`)
+    // Example post-deployment actions:
 
-  // You can add post-deployment actions here
-  // For example: send notifications, update status pages, run tests, etc.
+    // 1. Health check
+    try {
+      const healthCheck = await fetch(`https://${deployment.url}/api/health`, {
+        method: "GET",
+        timeout: 10000,
+      })
 
-  return {
-    success: true,
-    message: "Deployment succeeded",
-    deployment: {
-      id: deployment?.id,
-      url: deployment?.url,
-      state: deployment?.state,
-      project: project?.name,
-      ready_at: deployment?.readyAt,
-      build_duration:
-        deployment?.buildingAt && deployment?.readyAt
-          ? new Date(deployment.readyAt).getTime() - new Date(deployment.buildingAt).getTime()
-          : null,
-    },
-    actions: {
-      notification_sent: false, // Implement notification logic
-      status_updated: false, // Implement status page update
-      tests_triggered: false, // Implement test automation
-    },
+      if (healthCheck.ok) {
+        console.log(`✅ Health check passed for ${deployment.url}`)
+      } else {
+        console.warn(`⚠️ Health check failed for ${deployment.url}: ${healthCheck.status}`)
+      }
+    } catch (healthError) {
+      console.warn(`⚠️ Health check error for ${deployment.url}:`, healthError)
+    }
+
+    // 2. Cache warming (if needed)
+    // await warmCache(deployment.url)
+
+    // 3. Notify team/monitoring systems
+    // await notifyDeploymentSuccess(deployment, project)
+
+    // 4. Update database records
+    // await updateDeploymentRecord(deployment)
+
+    console.log(`✅ Post-deployment actions completed for ${deployment.url}`)
+  } catch (error) {
+    console.error("Post-deployment actions failed:", error)
   }
 }
 
-async function handleDeploymentFailed(payload: any) {
-  const deployment = payload.deployment
-  const project = payload.project
+async function handleDeploymentFailure(deployment: any, project: any) {
+  try {
+    console.log(`🔍 Handling deployment failure for ${project.name}`)
 
-  console.log(`❌ Deployment failed: ${deployment?.url} (${project?.name})`)
+    // Example failure handling actions:
 
-  // You can add failure handling here
-  // For example: send alerts, create issues, rollback, etc.
+    // 1. Log detailed error information
+    console.error("Deployment failure details:", {
+      deployment_id: deployment.id,
+      project: project.name,
+      error: deployment.error,
+      created_at: deployment.createdAt,
+    })
 
-  return {
-    success: true,
-    message: "Deployment failed",
-    deployment: {
-      id: deployment?.id,
-      url: deployment?.url,
-      state: deployment?.state,
-      project: project?.name,
-      failed_at: deployment?.readyAt,
-      error: deployment?.error,
-    },
-    actions: {
-      alert_sent: false, // Implement alerting logic
-      issue_created: false, // Implement issue creation
-      rollback_triggered: false, // Implement rollback logic
-    },
-  }
-}
+    // 2. Notify team of failure
+    // await notifyDeploymentFailure(deployment, project)
 
-async function handleDeploymentCanceled(payload: any) {
-  const deployment = payload.deployment
-  const project = payload.project
+    // 3. Trigger rollback if needed
+    // await triggerRollback(project)
 
-  console.log(`⏹️ Deployment canceled: ${deployment?.url} (${project?.name})`)
+    // 4. Update monitoring/alerting systems
+    // await updateMonitoringStatus(deployment, 'failed')
 
-  return {
-    success: true,
-    message: "Deployment canceled",
-    deployment: {
-      id: deployment?.id,
-      url: deployment?.url,
-      state: deployment?.state,
-      project: project?.name,
-      canceled_at: deployment?.canceledAt,
-    },
-  }
-}
-
-async function handleGenericVercelEvent(payload: any) {
-  console.log(`▲ Vercel event: ${payload.type || "unknown"}`)
-
-  return {
-    success: true,
-    message: `Vercel ${payload.type || "unknown"} event processed`,
-    payload_keys: Object.keys(payload),
+    console.log(`📝 Deployment failure handling completed for ${project.name}`)
+  } catch (error) {
+    console.error("Deployment failure handling error:", error)
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    message: "Vercel webhook endpoint is active",
-    endpoint: "/api/webhooks/vercel",
-    supported_events: ["deployment.created", "deployment.succeeded", "deployment.failed", "deployment.canceled"],
-    setup_instructions: {
-      "1": "Go to your Vercel project settings",
-      "2": "Navigate to the Git section",
-      "3": "Add a new webhook with URL: https://3bdulaziz.vercel.app/api/webhooks/vercel",
-      "4": "Select the events you want to receive",
-    },
-    monitoring: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-  })
+  try {
+    return NextResponse.json({
+      message: "Vercel webhook endpoint is operational",
+      endpoint: "/api/webhooks/vercel",
+      methods: ["POST"],
+      description: "Handles Vercel deployment webhooks",
+      supported_events: [
+        "deployment.created",
+        "deployment.building",
+        "deployment.ready",
+        "deployment.error",
+        "deployment.canceled",
+      ],
+      setup_instructions: {
+        step1: "Go to your Vercel project settings",
+        step2: "Navigate to the 'Git' tab",
+        step3: "Add webhook URL: https://3bdulaziz.vercel.app/api/webhooks/vercel",
+        step4: "Configure events you want to receive",
+        step5: "Add webhook secret (optional but recommended)",
+      },
+      monitoring: {
+        webhook_site: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+        events_api: "/api/webhooks/events?source=vercel",
+        stats_api: "/api/webhooks/stats",
+      },
+    })
+  } catch (error) {
+    console.error("Vercel webhook GET error:", error)
+    return NextResponse.json({ error: "Failed to get webhook info" }, { status: 500 })
+  }
 }
