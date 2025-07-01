@@ -1,192 +1,195 @@
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE,
-    phone VARCHAR(20) UNIQUE,
-    avatar TEXT,
-    provider VARCHAR(20) NOT NULL CHECK (provider IN ('github', 'phone')),
-    github_id VARCHAR(50) UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_login TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Enhanced DrX3 Database Schema v2
+-- This script creates additional tables and indexes for improved performance
 
--- Create sessions table
-CREATE TABLE IF NOT EXISTS sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token VARCHAR(255) NOT NULL UNIQUE,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    ip_address INET,
-    user_agent TEXT,
-    is_active BOOLEAN DEFAULT TRUE
-);
-
--- Create phone_verifications table
-CREATE TABLE IF NOT EXISTS phone_verifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    phone VARCHAR(20) NOT NULL,
-    code VARCHAR(6) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    attempts INTEGER DEFAULT 0,
-    verified BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create conversations table
-CREATE TABLE IF NOT EXISTS conversations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(500) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    metadata JSONB DEFAULT '{}'::jsonb
-);
-
--- Create messages table
-CREATE TABLE IF NOT EXISTS messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
-    content TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    metadata JSONB DEFAULT '{}'::jsonb
-);
-
--- Create usage_logs table
-CREATE TABLE IF NOT EXISTS usage_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id VARCHAR(255) NOT NULL,
-    provider VARCHAR(50) NOT NULL,
-    model VARCHAR(100) NOT NULL,
-    tokens_used INTEGER NOT NULL DEFAULT 0,
-    processing_time_ms INTEGER NOT NULL DEFAULT 0,
-    success BOOLEAN NOT NULL DEFAULT true,
-    error_message TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    metadata JSONB DEFAULT '{}'::jsonb
-);
-
--- Create webhook_events table
-CREATE TABLE IF NOT EXISTS webhook_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type VARCHAR(100) NOT NULL,
-    source VARCHAR(50) NOT NULL CHECK (source IN ('github', 'vercel', 'custom')),
-    payload JSONB NOT NULL,
-    headers JSONB NOT NULL DEFAULT '{}'::jsonb,
-    processed BOOLEAN NOT NULL DEFAULT false,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    error_message TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create webhook_configs table
-CREATE TABLE IF NOT EXISTS webhook_configs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    url TEXT NOT NULL,
-    secret VARCHAR(255),
-    events JSONB NOT NULL DEFAULT '[]'::jsonb,
-    active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_triggered TIMESTAMP WITH TIME ZONE,
-    success_count INTEGER NOT NULL DEFAULT 0,
-    failure_count INTEGER NOT NULL DEFAULT 0
-);
-
--- Create github_analytics table
-CREATE TABLE IF NOT EXISTS github_analytics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_type VARCHAR(50) NOT NULL,
-    repository VARCHAR(255) NOT NULL,
-    user VARCHAR(255) NOT NULL,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create deployment_analytics table
-CREATE TABLE IF NOT EXISTS deployment_analytics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project VARCHAR(255) NOT NULL,
-    deployment_id VARCHAR(255) NOT NULL,
-    state VARCHAR(50) NOT NULL,
-    url TEXT,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create indexes for better performance
+-- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
-CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
-CREATE INDEX IF NOT EXISTS idx_usage_logs_session_id ON usage_logs(session_id);
-CREATE INDEX IF NOT EXISTS idx_usage_logs_created_at ON usage_logs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_source ON webhook_events(source);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
-CREATE INDEX IF NOT EXISTS idx_github_analytics_repository ON github_analytics(repository);
-CREATE INDEX IF NOT EXISTS idx_github_analytics_created_at ON github_analytics(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_phone_number ON users(phone_number);
+CREATE INDEX IF NOT EXISTS idx_users_last_login ON users(last_login);
 
--- Create function to update updated_at timestamp
+-- Create indexes for chat messages
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at);
+
+-- Create indexes for webhook events
+CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
+
+-- Create indexes for AI requests
+CREATE INDEX IF NOT EXISTS idx_ai_requests_user_id ON ai_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_requests_created_at ON ai_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_requests_model ON ai_requests(model);
+
+-- Create indexes for phone verifications
+CREATE INDEX IF NOT EXISTS idx_phone_verifications_phone_number ON phone_verifications(phone_number);
+CREATE INDEX IF NOT EXISTS idx_phone_verifications_expires_at ON phone_verifications(expires_at);
+
+-- Add user preferences table
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    theme VARCHAR(20) DEFAULT 'light',
+    language VARCHAR(10) DEFAULT 'en',
+    notifications_enabled BOOLEAN DEFAULT true,
+    email_notifications BOOLEAN DEFAULT true,
+    push_notifications BOOLEAN DEFAULT false,
+    preferred_ai_model VARCHAR(50) DEFAULT 'groq',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- Add chat sessions table for better organization
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(255) UNIQUE NOT NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255),
+    model VARCHAR(50),
+    total_messages INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    archived BOOLEAN DEFAULT false
+);
+
+-- Add API usage tracking table
+CREATE TABLE IF NOT EXISTS api_usage (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    endpoint VARCHAR(255) NOT NULL,
+    method VARCHAR(10) NOT NULL,
+    status_code INTEGER,
+    response_time_ms INTEGER,
+    tokens_used INTEGER DEFAULT 0,
+    cost_cents INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add system logs table
+CREATE TABLE IF NOT EXISTS system_logs (
+    id SERIAL PRIMARY KEY,
+    level VARCHAR(20) NOT NULL, -- info, warn, error, debug
+    message TEXT NOT NULL,
+    component VARCHAR(100),
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add feature flags table
+CREATE TABLE IF NOT EXISTS feature_flags (
+    id SERIAL PRIMARY KEY,
+    flag_name VARCHAR(100) UNIQUE NOT NULL,
+    enabled BOOLEAN DEFAULT false,
+    description TEXT,
+    rollout_percentage INTEGER DEFAULT 0 CHECK (rollout_percentage >= 0 AND rollout_percentage <= 100),
+    target_users JSONB, -- Array of user IDs or criteria
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_session_id ON chat_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_created_at ON chat_sessions(created_at);
+CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage(created_at);
+CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage(endpoint);
+CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level);
+CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_system_logs_component ON system_logs(component);
+CREATE INDEX IF NOT EXISTS idx_feature_flags_flag_name ON feature_flags(flag_name);
+
+-- Add triggers to update timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = NOW();
+    NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+-- Apply update triggers to relevant tables
+DROP TRIGGER IF EXISTS update_user_preferences_updated_at ON user_preferences;
+CREATE TRIGGER update_user_preferences_updated_at 
+    BEFORE UPDATE ON user_preferences 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations
+DROP TRIGGER IF EXISTS update_chat_sessions_updated_at ON chat_sessions;
+CREATE TRIGGER update_chat_sessions_updated_at 
+    BEFORE UPDATE ON chat_sessions 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON messages
+DROP TRIGGER IF EXISTS update_feature_flags_updated_at ON feature_flags;
+CREATE TRIGGER update_feature_flags_updated_at 
+    BEFORE UPDATE ON feature_flags 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_webhook_configs_updated_at BEFORE UPDATE ON webhook_configs
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Insert default feature flags
+INSERT INTO feature_flags (flag_name, enabled, description, rollout_percentage) VALUES
+('advanced_ai_models', false, 'Enable access to advanced AI models like GPT-4', 0),
+('real_time_chat', true, 'Enable real-time chat features', 100),
+('webhook_analytics', true, 'Enable detailed webhook analytics', 100),
+('phone_auth', true, 'Enable phone number authentication', 100),
+('github_integration', true, 'Enable GitHub OAuth integration', 100)
+ON CONFLICT (flag_name) DO NOTHING;
 
--- Insert sample data for testing
-INSERT INTO users (name, email, provider, github_id) VALUES 
-('مطور تجريبي', 'test@example.com', 'github', '12345')
-ON CONFLICT (email) DO NOTHING;
+-- Create a view for user statistics
+CREATE OR REPLACE VIEW user_stats_view AS
+SELECT 
+    u.id,
+    u.email,
+    u.github_username,
+    u.phone_number,
+    u.created_at as user_created_at,
+    u.last_login,
+    COUNT(DISTINCT cs.id) as total_chat_sessions,
+    COUNT(DISTINCT cm.id) as total_messages,
+    COUNT(DISTINCT ar.id) as total_ai_requests,
+    COALESCE(SUM(ar.tokens_used), 0) as total_tokens_used,
+    COALESCE(SUM(au.cost_cents), 0) as total_cost_cents
+FROM users u
+LEFT JOIN chat_sessions cs ON u.id = cs.user_id
+LEFT JOIN chat_messages cm ON u.id = cm.user_id
+LEFT JOIN ai_requests ar ON u.id = ar.user_id
+LEFT JOIN api_usage au ON u.id = au.user_id
+GROUP BY u.id, u.email, u.github_username, u.phone_number, u.created_at, u.last_login;
 
--- Insert sample conversation
-WITH sample_user AS (
-    SELECT id FROM users WHERE email = 'test@example.com' LIMIT 1
-)
-INSERT INTO conversations (user_id, title) 
-SELECT id, 'محادثة تجريبية' FROM sample_user
-ON CONFLICT DO NOTHING;
+-- Create a view for system health metrics
+CREATE OR REPLACE VIEW system_health_view AS
+SELECT 
+    COUNT(CASE WHEN created_at > NOW() - INTERVAL '1 hour' THEN 1 END) as requests_last_hour,
+    COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as requests_last_day,
+    AVG(response_time_ms) as avg_response_time_ms,
+    COUNT(CASE WHEN status_code >= 500 THEN 1 END) as server_errors,
+    COUNT(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 END) as client_errors,
+    COUNT(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 END) as successful_requests
+FROM api_usage
+WHERE created_at > NOW() - INTERVAL '24 hours';
 
--- Insert sample messages
-WITH sample_conversation AS (
-    SELECT c.id FROM conversations c
-    JOIN users u ON c.user_id = u.id
-    WHERE u.email = 'test@example.com'
-    LIMIT 1
-)
-INSERT INTO messages (conversation_id, role, content) 
-SELECT id, 'user', 'مرحبا، كيف يمكنني استخدام هذا النظام؟' FROM sample_conversation
-UNION ALL
-SELECT id, 'assistant', 'مرحبا! يمكنك استخدام هذا النظام للدردشة مع المساعد الذكي. ما الذي تود معرفته؟' FROM sample_conversation
-ON CONFLICT DO NOTHING;
+-- Add comments for documentation
+COMMENT ON TABLE user_preferences IS 'User-specific preferences and settings';
+COMMENT ON TABLE chat_sessions IS 'Chat session metadata and organization';
+COMMENT ON TABLE api_usage IS 'API usage tracking and analytics';
+COMMENT ON TABLE system_logs IS 'System-wide logging and monitoring';
+COMMENT ON TABLE feature_flags IS 'Feature flag management for gradual rollouts';
+COMMENT ON VIEW user_stats_view IS 'Aggregated user statistics and usage metrics';
+COMMENT ON VIEW system_health_view IS 'Real-time system health and performance metrics';
 
--- Insert sample usage log
-INSERT INTO usage_logs (session_id, provider, model, tokens_used, processing_time_ms, success)
-VALUES ('test-session', 'groq', 'llama-3.1-8b-instant', 150, 1200, true)
-ON CONFLICT DO NOTHING;
+-- Grant permissions (adjust as needed for your setup)
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO your_app_user;
+-- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO your_app_user;
+-- GRANT SELECT ON ALL VIEWS IN SCHEMA public TO your_app_user;
 
-COMMIT;
+-- Success message
+DO $$
+BEGIN
+    RAISE NOTICE 'DrX3 database schema v2 setup completed successfully!';
+    RAISE NOTICE 'New tables created: user_preferences, chat_sessions, api_usage, system_logs, feature_flags';
+    RAISE NOTICE 'Views created: user_stats_view, system_health_view';
+    RAISE NOTICE 'Indexes and triggers added for improved performance';
+END $$;

@@ -3,16 +3,13 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Send, Bot, UserIcon, Loader2, ArrowLeft, Sparkles } from "lucide-react"
-import { toast } from "sonner"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Send, Bot, User, Loader2, MessageSquare, Sparkles, Trash2 } from "lucide-react"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { TypingIndicator } from "@/components/typing-indicator"
 
@@ -21,101 +18,173 @@ interface Message {
   role: "user" | "assistant"
   content: string
   timestamp: Date
-  provider?: string
   model?: string
-  tokensUsed?: number
+  tokens?: number
 }
 
-interface ChatUser {
+interface ChatSession {
   id: string
-  name: string
-  avatar?: string
+  title: string
+  messages: Message[]
+  model: string
+  createdAt: Date
 }
 
 export default function ChatPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<ChatUser | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string>("")
+  const [selectedModel, setSelectedModel] = useState("groq")
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const availableModels = [
+    { id: "groq", name: "Groq (Fast)", description: "Lightning fast responses" },
+    { id: "together", name: "Together AI", description: "High quality responses" },
+  ]
 
   useEffect(() => {
-    checkAuth()
+    // Generate session ID on mount
+    setSessionId(`chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
+
+    // Load existing messages if any
+    loadChatHistory()
+
+    // Focus input on mount
+    inputRef.current?.focus()
   }, [])
 
   useEffect(() => {
     scrollToBottom()
   }, [messages, isTyping])
 
-  const checkAuth = async () => {
-    try {
-      const response = await fetch("/api/auth/me")
-      const data = await response.json()
-
-      if (data.authenticated) {
-        setUser(data.user)
-      } else {
-        router.push("/auth")
-      }
-    } catch (error) {
-      console.error("Auth check error:", error)
-      router.push("/auth")
-    }
-  }
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const loadChatHistory = async () => {
+    try {
+      // In a real app, you'd load from your backend
+      const savedMessages = localStorage.getItem(`chat-${sessionId}`)
+      if (savedMessages) {
+        setMessages(JSON.parse(savedMessages))
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error)
+    }
+  }
 
+  const saveChatHistory = (newMessages: Message[]) => {
+    try {
+      localStorage.setItem(`chat-${sessionId}`, JSON.stringify(newMessages))
+    } catch (error) {
+      console.error("Error saving chat history:", error)
+    }
+  }
+
+  const sendMessage = async () => {
     if (!input.trim() || isLoading) return
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `msg-${Date.now()}-user`,
       role: "user",
       content: input.trim(),
       timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    const newMessages = [...messages, userMessage]
+    setMessages(newMessages)
     setInput("")
     setIsLoading(true)
     setIsTyping(true)
+    setError(null)
 
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          message: userMessage.content,
-          conversationId: "current-chat", // In a real app, this would be dynamic
+          messages: newMessages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          model: selectedModel,
+          sessionId,
         }),
       })
 
-      const data = await response.json()
-
-      if (data.success) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.response.content,
-          timestamp: new Date(),
-          provider: data.response.provider,
-          model: data.response.model,
-          tokensUsed: data.response.tokensUsed,
-        }
-
-        setMessages((prev) => [...prev, assistantMessage])
-      } else {
-        toast.error(data.message || "حدث خطأ في الإرسال")
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("No response body")
+      }
+
+      let assistantContent = ""
+      const assistantMessage: Message = {
+        id: `msg-${Date.now()}-assistant`,
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+        model: selectedModel,
+      }
+
+      const updatedMessages = [...newMessages, assistantMessage]
+      setMessages(updatedMessages)
+      setIsTyping(false)
+
+      // Read the stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = new TextDecoder().decode(value)
+        const lines = chunk.split("\n")
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6)
+            if (data === "[DONE]") continue
+
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.content) {
+                assistantContent += parsed.content
+
+                // Update the assistant message
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  const lastMessage = updated[updated.length - 1]
+                  if (lastMessage.role === "assistant") {
+                    lastMessage.content = assistantContent
+                  }
+                  return updated
+                })
+              }
+            } catch (parseError) {
+              console.error("Error parsing streaming response:", parseError)
+            }
+          }
+        }
+      }
+
+      // Save final messages
+      const finalMessages = [...newMessages, { ...assistantMessage, content: assistantContent }]
+      setMessages(finalMessages)
+      saveChatHistory(finalMessages)
     } catch (error) {
-      console.error("Send message error:", error)
-      toast.error("حدث خطأ في الاتصال")
+      console.error("Error sending message:", error)
+      setError(error instanceof Error ? error.message : "Failed to send message")
+
+      // Remove the user message if there was an error
+      setMessages(messages)
     } finally {
       setIsLoading(false)
       setIsTyping(false)
@@ -124,165 +193,190 @@ export default function ChatPage() {
 
   const clearChat = () => {
     setMessages([])
-    toast.success("تم مسح المحادثة")
+    setError(null)
+    localStorage.removeItem(`chat-${sessionId}`)
+    inputRef.current?.focus()
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4 rtl:space-x-reverse">
-              <Button onClick={() => router.push("/dashboard")} variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                العودة
-              </Button>
-              <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                <Bot className="w-8 h-8 text-blue-600" />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">المساعد الذكي</h1>
-                  <p className="text-sm text-gray-500">مدعوم بـ Groq و Together AI</p>
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto max-w-4xl p-4 h-screen flex flex-col">
+        {/* Header */}
+        <Card className="mb-4 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center text-xl">
+                <MessageSquare className="w-6 h-6 mr-2 text-blue-600" />
+                DrX3 AI Chat
+                <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Online
+                </Badge>
+              </CardTitle>
+              <div className="flex items-center space-x-2">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white"
+                  disabled={isLoading}
+                >
+                  {availableModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="outline" size="sm" onClick={clearChat} disabled={isLoading || messages.length === 0}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center space-x-3 rtl:space-x-reverse">
-              <Badge variant="secondary" className="hidden sm:inline-flex">
-                {messages.length} رسالة
-              </Badge>
-              <Button onClick={clearChat} variant="outline" size="sm">
-                مسح المحادثة
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+            {selectedModel && (
+              <p className="text-sm text-gray-600 mt-1">
+                Using {availableModels.find((m) => m.id === selectedModel)?.description}
+              </p>
+            )}
+          </CardHeader>
+        </Card>
 
-      {/* Chat Area */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        <Card className="h-[calc(100vh-200px)] flex flex-col">
-          {/* Messages */}
-          <ScrollArea className="flex-1 p-4">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">مرحباً {user.name}!</h3>
+        {/* Messages */}
+        <Card className="flex-1 mb-4 bg-white/80 backdrop-blur-sm border-0 shadow-lg overflow-hidden">
+          <CardContent className="p-0 h-full">
+            <ScrollArea className="h-full p-4">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                  <Bot className="w-16 h-16 text-blue-400 mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">Welcome to DrX3 AI Chat</h3>
                   <p className="text-gray-500 max-w-md">
-                    أنا مساعدك الذكي. يمكنني مساعدتك في الإجابة على أسئلتك، كتابة النصوص، البرمجة، والكثير من المهام
-                    الأخرى. ما الذي تود معرفته؟
+                    Start a conversation with our AI assistant. Ask questions, get help with coding, or just have a
+                    friendly chat!
                   </p>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg">
+                    <Button
+                      variant="outline"
+                      className="text-left justify-start bg-transparent"
+                      onClick={() => setInput("What can you help me with?")}
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      What can you help me with?
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-left justify-start bg-transparent"
+                      onClick={() => setInput("Explain quantum computing")}
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Explain quantum computing
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex items-start space-x-3 rtl:space-x-reverse ${
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    {message.role === "assistant" && (
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-blue-100 text-blue-600">
-                          <Bot className="w-4 h-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message) => (
                     <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+                      key={message.id}
+                      className={`flex items-start space-x-3 ${
+                        message.role === "user" ? "flex-row-reverse space-x-reverse" : ""
                       }`}
                     >
-                      {message.role === "assistant" ? (
-                        <MarkdownRenderer content={message.content} />
-                      ) : (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                      )}
-
-                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                        <span>
-                          {message.timestamp.toLocaleTimeString("ar-SA", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        {message.provider && (
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <Badge variant="outline" className="text-xs">
-                              {message.provider}
-                            </Badge>
-                            {message.tokensUsed && <span>{message.tokensUsed} رمز</span>}
-                          </div>
-                        )}
+                      <div
+                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                          message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-600"
+                        }`}
+                      >
+                        {message.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                      </div>
+                      <div className={`flex-1 max-w-3xl ${message.role === "user" ? "text-right" : "text-left"}`}>
+                        <div
+                          className={`inline-block p-3 rounded-lg ${
+                            message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
+                          }`}
+                        >
+                          {message.role === "assistant" ? (
+                            <MarkdownRenderer content={message.content} />
+                          ) : (
+                            <p className="whitespace-pre-wrap">{message.content}</p>
+                          )}
+                        </div>
+                        <div
+                          className={`text-xs text-gray-500 mt-1 ${
+                            message.role === "user" ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {formatTime(message.timestamp)}
+                          {message.model && <span className="ml-2">• {message.model}</span>}
+                        </div>
                       </div>
                     </div>
+                  ))}
 
-                    {message.role === "user" && (
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                        <AvatarFallback className="bg-gray-100 text-gray-600">
-                          <UserIcon className="w-4 h-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-
-                {isTyping && (
-                  <div className="flex items-start space-x-3 rtl:space-x-reverse">
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                  {isTyping && (
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center">
                         <Bot className="w-4 h-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="bg-gray-100 rounded-lg px-4 py-2">
-                      <TypingIndicator />
+                      </div>
+                      <div className="flex-1">
+                        <div className="inline-block p-3 rounded-lg bg-gray-100">
+                          <TypingIndicator />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </ScrollArea>
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
 
-          <Separator />
+        {/* Error Alert */}
+        {error && (
+          <Alert className="mb-4 border-red-200 bg-red-50">
+            <AlertDescription className="text-red-800">
+              {error}
+              <Button variant="link" size="sm" onClick={() => setError(null)} className="ml-2 text-red-600 p-0 h-auto">
+                Dismiss
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {/* Input Form */}
-          <form onSubmit={sendMessage} className="p-4">
-            <div className="flex space-x-2 rtl:space-x-reverse">
+        {/* Input */}
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex space-x-2">
               <Input
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="اكتب رسالتك هنا..."
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message here..."
                 disabled={isLoading}
                 className="flex-1"
-                maxLength={2000}
               />
-              <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+              <Button onClick={sendMessage} disabled={isLoading || !input.trim()} size="icon">
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
             </div>
-            <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
-              <span>{input.length}/2000</span>
-              <span>اضغط Enter للإرسال</span>
+            <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+              <span>Press Enter to send, Shift+Enter for new line</span>
+              <span>{messages.length} messages</span>
             </div>
-          </form>
+          </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   )
 }
