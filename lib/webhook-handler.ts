@@ -1,3 +1,5 @@
+import { DrXDatabase } from "./database"
+import { v4 as uuidv4 } from "uuid"
 import crypto from "crypto"
 
 interface WebhookConfig {
@@ -8,11 +10,120 @@ interface WebhookConfig {
   headers?: Record<string, string>
 }
 
+export interface WebhookEvent {
+  id: string
+  type: string
+  timestamp: string
+  source: string
+  data: any
+  metadata?: {
+    userAgent?: string
+    ip?: string
+    headers?: Record<string, string>
+    signature?: string
+    delivery?: string
+  }
+}
+
 export class WebhookHandler {
   private config: WebhookConfig
 
   constructor(config: WebhookConfig) {
     this.config = config
+  }
+
+  async processWebhook(event: Omit<WebhookEvent, "id">): Promise<WebhookEvent> {
+    const webhookEvent: WebhookEvent = {
+      id: uuidv4(),
+      ...event,
+      timestamp: new Date().toISOString(),
+    }
+
+    try {
+      // Log the event
+      globalWebhookLogger.log(webhookEvent)
+
+      // Process based on source
+      await this.processEventBySource(webhookEvent)
+
+      webhookEvent.metadata = { ...webhookEvent.metadata, processed: true }
+
+      // Update the logged event
+      globalWebhookLogger.updateEvent(webhookEvent.id)
+
+      return webhookEvent
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      webhookEvent.metadata = { ...webhookEvent.metadata, error: errorMessage, processed: false }
+
+      console.error(`Webhook processing failed for ${webhookEvent.id}:`, error)
+
+      // Update the logged event with error
+      globalWebhookLogger.updateEvent(webhookEvent.id)
+
+      return webhookEvent
+    }
+  }
+
+  private async processEventBySource(event: WebhookEvent): Promise<void> {
+    switch (event.source) {
+      case "github":
+        await this.processGitHubEvent(event)
+        break
+      case "vercel":
+        await this.processVercelEvent(event)
+        break
+      case "generic":
+      default:
+        await this.processGenericEvent(event)
+        break
+    }
+  }
+
+  private async processGitHubEvent(event: WebhookEvent): Promise<void> {
+    const { type, data } = event
+
+    switch (type) {
+      case "github.push":
+        console.log(`GitHub Push: ${data.commits?.length || 0} commits to ${data.ref}`)
+        break
+      case "github.pull_request":
+        console.log(`GitHub PR: ${data.action} #${data.number}`)
+        break
+      case "github.issues":
+        console.log(`GitHub Issue: ${data.action} #${data.issue?.number}`)
+        break
+      case "github.release":
+        console.log(`GitHub Release: ${data.action} ${data.release?.tag_name}`)
+        break
+      case "github.ping":
+        console.log("GitHub Ping received")
+        break
+      default:
+        console.log(`GitHub Event: ${type}`)
+    }
+  }
+
+  private async processVercelEvent(event: WebhookEvent): Promise<void> {
+    const { type, data } = event
+
+    switch (type) {
+      case "vercel.deployment.created":
+        console.log(`Vercel Deployment Created: ${data.deployment?.url}`)
+        break
+      case "vercel.deployment.succeeded":
+        console.log(`Vercel Deployment Succeeded: ${data.deployment?.url}`)
+        break
+      case "vercel.deployment.failed":
+        console.log(`Vercel Deployment Failed: ${data.deployment?.url}`)
+        break
+      default:
+        console.log(`Vercel Event: ${type}`)
+    }
+  }
+
+  private async processGenericEvent(event: WebhookEvent): Promise<void> {
+    console.log(`Generic Webhook: ${event.type}`)
   }
 
   async send(payload: any, additionalHeaders: Record<string, string> = {}): Promise<boolean> {
@@ -93,50 +204,30 @@ export class WebhookHandler {
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
-}
 
-// Default webhook configurations
-export const webhookConfigs = {
-  webhookSite: {
-    url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-    retryAttempts: 3,
-    timeout: 10000,
-    headers: {
-      "X-Source": "drx3-api",
-      "X-Environment": process.env.NODE_ENV || "development",
-    },
-  },
-  github: {
-    url: "https://api.github.com/repos/wolfomani/3bdulaziz/dispatches",
-    retryAttempts: 2,
-    timeout: 5000,
-    headers: {
-      Authorization: `token ${process.env.GITHUB_TOKEN}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-  },
-  vercel: {
-    url: process.env.VERCEL_DEPLOY_HOOK || "https://api.vercel.com/v1/integrations/deploy",
-    retryAttempts: 3,
-    timeout: 8000,
-    headers: {
-      Authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
-    },
-  },
-}
+  async getSystemHealth(): Promise<{
+    status: string
+    database: boolean
+    events_processed: number
+    last_event?: string
+  }> {
+    try {
+      const dbHealth = await DrXDatabase.healthCheck()
+      const stats = globalWebhookLogger.getStatistics()
 
-export interface WebhookEvent {
-  id: string
-  type: string
-  timestamp: string
-  source: string
-  data: any
-  metadata?: {
-    userAgent?: string
-    ip?: string
-    headers?: Record<string, string>
-    signature?: string
-    delivery?: string
+      return {
+        status: dbHealth ? "healthy" : "degraded",
+        database: dbHealth,
+        events_processed: stats.total,
+        last_event: stats.newestEvent,
+      }
+    } catch (error) {
+      return {
+        status: "unhealthy",
+        database: false,
+        events_processed: 0,
+      }
+    }
   }
 }
 
@@ -154,6 +245,13 @@ export class WebhookEventLogger {
     }
 
     console.log(`📝 Logged webhook event: ${event.type} (${event.source}) - ${event.id}`)
+  }
+
+  updateEvent(id: string): void {
+    const event = this.getEventById(id)
+    if (event) {
+      console.log(`🔄 Updated webhook event: ${event.type} (${event.source}) - ${event.id}`)
+    }
   }
 
   getEvents(limit?: number): WebhookEvent[] {
@@ -218,32 +316,33 @@ export const globalWebhookLogger = new WebhookEventLogger()
 
 // Webhook utilities
 export class WebhookUtils {
-  static validatePayload(payload: any, requiredFields: string[]): boolean {
-    return requiredFields.every((field) => {
-      const value = field.split(".").reduce((obj, key) => obj?.[key], payload)
-      return value !== undefined && value !== null
-    })
+  static validateSignature(payload: string, signature: string, secret: string): boolean {
+    try {
+      const expectedSignature = `sha256=${crypto.createHmac("sha256", secret).update(payload).digest("hex")}`
+      return signature === expectedSignature
+    } catch (error) {
+      console.error("Error validating webhook signature:", error)
+      return false
+    }
   }
 
-  static sanitizePayload(payload: any, sensitiveFields: string[] = []): any {
-    const sanitized = JSON.parse(JSON.stringify(payload))
+  static parseGitHubEvent(headers: Record<string, string>, payload: any) {
+    return {
+      event: headers["x-github-event"],
+      delivery: headers["x-github-delivery"],
+      signature: headers["x-hub-signature-256"],
+      repository: payload.repository?.full_name,
+      sender: payload.sender?.login,
+    }
+  }
 
-    sensitiveFields.forEach((field) => {
-      const keys = field.split(".")
-      let obj = sanitized
-      for (let i = 0; i < keys.length - 1; i++) {
-        if (obj[keys[i]]) {
-          obj = obj[keys[i]]
-        } else {
-          return
-        }
-      }
-      if (obj[keys[keys.length - 1]]) {
-        obj[keys[keys.length - 1]] = "[REDACTED]"
-      }
-    })
-
-    return sanitized
+  static parseVercelEvent(headers: Record<string, string>, payload: any) {
+    return {
+      event: headers["x-vercel-event"],
+      signature: headers["x-vercel-signature"],
+      deployment: payload.deployment?.url,
+      project: payload.project?.name,
+    }
   }
 
   static extractMetadata(request: Request): Record<string, string> {
@@ -271,4 +370,57 @@ export class WebhookUtils {
 
     return metadata
   }
+
+  static async retryWithBackoff<T>(fn: () => Promise<T>, maxAttempts = 3, baseDelay = 1000): Promise<T> {
+    let lastError: Error
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn()
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+
+        if (attempt === maxAttempts) {
+          throw lastError
+        }
+
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 10000)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+
+    throw lastError!
+  }
 }
+
+// Default webhook configurations
+export const webhookConfigs = {
+  webhookSite: {
+    url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+    retryAttempts: 3,
+    timeout: 10000,
+    headers: {
+      "X-Source": "drx3-api",
+      "X-Environment": process.env.NODE_ENV || "development",
+    },
+  },
+  github: {
+    url: "https://api.github.com/repos/wolfomani/3bdulaziz/dispatches",
+    retryAttempts: 2,
+    timeout: 5000,
+    headers: {
+      Authorization: `token ${process.env.GITHUB_TOKEN}`,
+      Accept: "application/vnd.github.v3+json",
+    },
+  },
+  vercel: {
+    url: process.env.VERCEL_DEPLOY_HOOK || "https://api.vercel.com/v1/integrations/deploy",
+    retryAttempts: 3,
+    timeout: 8000,
+    headers: {
+      Authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+    },
+  },
+}
+
+export default WebhookHandler

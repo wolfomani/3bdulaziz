@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
     // Parse query parameters
     const limit = Number.parseInt(searchParams.get("limit") || "50")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
-    const type = searchParams.get("type")
     const source = searchParams.get("source")
+    const type = searchParams.get("type")
     const since = searchParams.get("since")
     const until = searchParams.get("until")
 
@@ -17,12 +17,12 @@ export async function GET(request: NextRequest) {
     let events = globalWebhookLogger.getEvents()
 
     // Apply filters
-    if (type) {
-      events = events.filter((event) => event.type.includes(type))
-    }
-
     if (source) {
       events = events.filter((event) => event.source === source)
+    }
+
+    if (type) {
+      events = events.filter((event) => event.type.includes(type))
     }
 
     if (since) {
@@ -39,40 +39,26 @@ export async function GET(request: NextRequest) {
     const totalEvents = events.length
     const paginatedEvents = events.slice(offset, offset + limit)
 
-    // Calculate summary statistics
-    const eventTypes = [...new Set(events.map((e) => e.type))]
-    const eventSources = [...new Set(events.map((e) => e.source))]
-    const recentEvents = events.slice(0, 10)
+    // Calculate statistics
+    const statistics = globalWebhookLogger.getStatistics()
 
     return NextResponse.json({
       success: true,
-      data: {
-        events: paginatedEvents,
-        pagination: {
-          total: totalEvents,
-          limit,
-          offset,
-          hasMore: offset + limit < totalEvents,
-        },
-        summary: {
-          totalEvents,
-          uniqueTypes: eventTypes.length,
-          uniqueSources: eventSources.length,
-          dateRange: {
-            earliest: events.length > 0 ? events[events.length - 1].timestamp : null,
-            latest: events.length > 0 ? events[0].timestamp : null,
-          },
-        },
-        filters: {
-          type,
-          source,
-          since,
-          until,
-        },
-        availableTypes: eventTypes,
-        availableSources: eventSources,
+      events: paginatedEvents,
+      pagination: {
+        total: totalEvents,
+        limit,
+        offset,
+        has_more: offset + limit < totalEvents,
+        next_offset: offset + limit < totalEvents ? offset + limit : null,
       },
-      timestamp: new Date().toISOString(),
+      filters: {
+        source,
+        type,
+        since,
+        until,
+      },
+      statistics,
     })
   } catch (error) {
     console.error("Events API error:", error)
@@ -80,33 +66,68 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Failed to retrieve events",
-        message: error instanceof Error ? error.message : "Unknown error",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
-    // Clear all events
-    const clearedCount = globalWebhookLogger.clearEvents()
+    const { searchParams } = new URL(request.url)
+    const eventId = searchParams.get("id")
+    const clearAll = searchParams.get("clear") === "true"
 
-    console.log(`Cleared ${clearedCount} webhook events`)
+    if (clearAll) {
+      // Clear all events
+      const deletedCount = globalWebhookLogger.clearEvents()
 
-    return NextResponse.json({
-      success: true,
-      message: "All webhook events cleared successfully",
-      clearedCount,
-      timestamp: new Date().toISOString(),
-    })
+      return NextResponse.json({
+        success: true,
+        message: `Cleared ${deletedCount} webhook events`,
+        deleted_count: deletedCount,
+      })
+    } else if (eventId) {
+      // Delete specific event
+      const deleted = globalWebhookLogger.deleteEvent(eventId)
+
+      if (deleted) {
+        return NextResponse.json({
+          success: true,
+          message: `Event ${eventId} deleted successfully`,
+          event_id: eventId,
+        })
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Event not found",
+            event_id: eventId,
+          },
+          { status: 404 },
+        )
+      }
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Missing event ID or clear parameter",
+          usage: {
+            delete_specific: "DELETE /api/webhooks/events?id=event_id",
+            clear_all: "DELETE /api/webhooks/events?clear=true",
+          },
+        },
+        { status: 400 },
+      )
+    }
   } catch (error) {
-    console.error("Clear events error:", error)
+    console.error("Events DELETE error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to clear events",
-        message: error instanceof Error ? error.message : "Unknown error",
+        error: "Failed to delete events",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
@@ -116,72 +137,46 @@ export async function DELETE() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, eventId, filters } = body
+    const { action, event_ids } = body
 
-    switch (action) {
-      case "delete_event":
-        if (!eventId) {
-          return NextResponse.json({ error: "Event ID required" }, { status: 400 })
-        }
+    if (action === "bulk_delete" && Array.isArray(event_ids)) {
+      let deletedCount = 0
+      const results = []
 
+      for (const eventId of event_ids) {
         const deleted = globalWebhookLogger.deleteEvent(eventId)
-        return NextResponse.json({
-          success: deleted,
-          message: deleted ? "Event deleted successfully" : "Event not found",
-        })
-
-      case "bulk_delete":
-        if (!filters) {
-          return NextResponse.json({ error: "Filters required for bulk delete" }, { status: 400 })
+        if (deleted) {
+          deletedCount++
+          results.push({ event_id: eventId, deleted: true })
+        } else {
+          results.push({ event_id: eventId, deleted: false, reason: "not_found" })
         }
+      }
 
-        let events = globalWebhookLogger.getEvents()
-
-        // Apply filters for bulk delete
-        if (filters.type) {
-          events = events.filter((event) => event.type.includes(filters.type))
-        }
-        if (filters.source) {
-          events = events.filter((event) => event.source === filters.source)
-        }
-        if (filters.before) {
-          const beforeDate = new Date(filters.before)
-          events = events.filter((event) => new Date(event.timestamp) < beforeDate)
-        }
-
-        // Delete filtered events
-        let deletedCount = 0
-        events.forEach((event) => {
-          if (globalWebhookLogger.deleteEvent(event.id)) {
-            deletedCount++
-          }
-        })
-
-        return NextResponse.json({
-          success: true,
-          message: `Bulk deleted ${deletedCount} events`,
-          deletedCount,
-        })
-
-      case "export":
-        const exportEvents = globalWebhookLogger.getEvents()
-        return NextResponse.json({
-          success: true,
-          data: exportEvents,
-          exportedAt: new Date().toISOString(),
-          totalEvents: exportEvents.length,
-        })
-
-      default:
-        return NextResponse.json({ error: "Unknown action" }, { status: 400 })
+      return NextResponse.json({
+        success: true,
+        message: `Bulk delete completed: ${deletedCount}/${event_ids.length} events deleted`,
+        deleted_count: deletedCount,
+        total_requested: event_ids.length,
+        results,
+      })
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid action or missing event_ids",
+          supported_actions: ["bulk_delete"],
+        },
+        { status: 400 },
+      )
     }
   } catch (error) {
     console.error("Events POST error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Action failed",
-        message: error instanceof Error ? error.message : "Unknown error",
+        error: "Failed to process bulk action",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )

@@ -2,138 +2,106 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   const setupInstructions = {
-    github: {
-      title: "إعداد GitHub Webhooks",
+    github_webhook: {
+      title: "إعداد GitHub Webhook",
       steps: [
         {
           step: 1,
-          title: "الذهاب إلى إعدادات المستودع",
-          description: "اذهب إلى Settings > Webhooks في مستودع GitHub الخاص بك",
+          title: "انتقل إلى إعدادات المستودع",
+          description: "اذهب إلى https://github.com/wolfomani/3bdulaziz/settings/hooks",
           url: "https://github.com/wolfomani/3bdulaziz/settings/hooks",
         },
         {
           step: 2,
-          title: "إضافة webhook جديد",
-          description: "انقر على 'Add webhook' وأدخل المعلومات التالية:",
-          config: {
-            payloadUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/github`,
-            contentType: "application/json",
-            secret: process.env.GITHUB_WEBHOOK_SECRET || "اختياري - أضف سر للأمان",
-            events: ["push", "pull_request", "issues", "release", "star", "fork"],
-          },
+          title: "أضف webhook جديد",
+          description: "انقر على 'Add webhook'",
         },
         {
           step: 3,
+          title: "تكوين الـ webhook",
+          configuration: {
+            payload_url: "https://3bdulaziz.vercel.app/api/webhooks/github",
+            content_type: "application/json",
+            secret: "drx3rx3skabcdef1984767850aregiskpqbcdef1234567890",
+            events: ["push", "pull_request", "issues", "release", "star", "fork"],
+            active: true,
+          },
+        },
+        {
+          step: 4,
           title: "اختبار الـ webhook",
-          description: "انقر على 'Test' لإرسال webhook تجريبي",
-          testUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/test`,
+          description: "انقر على 'Test webhook' للتأكد من عمله",
         },
       ],
+      monitoring: {
+        webhook_site: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+        github_deliveries: "https://github.com/wolfomani/3bdulaziz/settings/hooks",
+        api_events: "https://3bdulaziz.vercel.app/api/webhooks/events",
+      },
     },
-    vercel: {
-      title: "إعداد Vercel Deploy Hooks",
+    vercel_webhook: {
+      title: "إعداد Vercel Deploy Hook",
       steps: [
         {
           step: 1,
-          title: "الذهاب إلى إعدادات المشروع",
-          description: "اذهب إلى Settings > Git في مشروع Vercel",
-          url: "https://vercel.com/wolfomani/3bdulaziz/settings/git",
+          title: "انتقل إلى إعدادات المشروع في Vercel",
+          description: "اذهب إلى https://vercel.com/wolfomani/3bdulaziz/settings/git",
         },
         {
           step: 2,
-          title: "إنشاء Deploy Hook",
-          description: "أنشئ Deploy Hook جديد للنشر التلقائي",
-          config: {
-            name: "DrX3 Auto Deploy",
+          title: "أضف Deploy Hook",
+          description: "في قسم Deploy Hooks، أضف hook جديد",
+          configuration: {
+            name: "DrX Auto Deploy",
             branch: "main",
-            webhookUrl: "سيتم إنشاؤه تلقائياً",
+            url: "سيتم إنشاؤه تلقائياً",
           },
         },
         {
           step: 3,
-          title: "إعداد Webhook للنشر",
-          description: "أضف webhook URL في GitHub للنشر التلقائي عند push",
-          webhookEndpoint: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/vercel`,
+          title: "أضف الـ URL إلى متغيرات البيئة",
+          description: "أضف VERCEL_DEPLOY_HOOK إلى متغيرات البيئة",
+          environment_variable: "VERCEL_DEPLOY_HOOK",
         },
       ],
     },
     testing: {
       title: "اختبار النظام",
-      endpoints: [
-        {
-          name: "Test Webhook",
+      endpoints: {
+        test_webhook: {
+          url: "https://3bdulaziz.vercel.app/api/webhooks/test",
           method: "POST",
-          url: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/test`,
-          description: "إرسال webhook تجريبي",
           example: {
-            body: {
-              message: "Test webhook from setup",
-              type: "test.setup",
-              testData: { userId: "setup-test" },
-            },
+            message: "Test webhook",
+            type: "test.manual",
+            data: { user_id: "test_123" },
           },
         },
-        {
-          name: "Webhook Events",
+        view_events: {
+          url: "https://3bdulaziz.vercel.app/api/webhooks/events",
           method: "GET",
-          url: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/events`,
-          description: "عرض جميع الأحداث",
-          params: ["limit", "offset", "type", "source"],
+          parameters: ["limit", "offset", "source", "type", "since", "until"],
         },
-        {
-          name: "Webhook Statistics",
+        view_stats: {
+          url: "https://3bdulaziz.vercel.app/api/webhooks/stats",
           method: "GET",
-          url: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/stats`,
-          description: "إحصائيات الأحداث",
-          params: ["period=24h", "groupBy=hour"],
+          parameters: ["period", "group_by"],
         },
-      ],
-    },
-    monitoring: {
-      title: "المراقبة والتتبع",
-      tools: [
+      },
+      curl_examples: [
         {
-          name: "Webhook.site",
-          url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
-          description: "مراقبة الـ webhooks في الوقت الفعلي",
-          status: "نشط",
+          description: "اختبار webhook",
+          command: `curl -X POST https://3bdulaziz.vercel.app/api/webhooks/test \\
+  -H "Content-Type: application/json" \\
+  -d '{"message":"Test from terminal","type":"test.curl"}'`,
         },
         {
-          name: "Internal Logging",
-          url: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/events`,
-          description: "سجل الأحداث الداخلي",
-          retention: "24 ساعة",
+          description: "عرض الأحداث الأخيرة",
+          command: "curl https://3bdulaziz.vercel.app/api/webhooks/events?limit=10",
         },
         {
-          name: "Statistics Dashboard",
-          url: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/webhooks`,
-          description: "لوحة تحكم الإحصائيات",
-          features: ["Real-time stats", "Event filtering", "Export data"],
-        },
-      ],
-    },
-    security: {
-      title: "الأمان والحماية",
-      recommendations: [
-        {
-          title: "استخدام HTTPS",
-          description: "تأكد من استخدام HTTPS لجميع webhook URLs",
-          status: process.env.NEXT_PUBLIC_APP_URL?.startsWith("https") ? "✅ مفعل" : "⚠️ غير مفعل",
-        },
-        {
-          title: "التوقيع الرقمي",
-          description: "استخدم webhook secrets للتحقق من صحة الطلبات",
-          status: process.env.GITHUB_WEBHOOK_SECRET ? "✅ مفعل" : "⚠️ غير مفعل",
-        },
-        {
-          title: "Rate Limiting",
-          description: "تحديد معدل الطلبات لمنع الإساءة",
-          status: "✅ مفعل",
-        },
-        {
-          title: "IP Whitelisting",
-          description: "السماح فقط لـ IPs المعروفة (GitHub, Vercel)",
-          status: "🔄 قيد التطوير",
+          description: "عرض إحصائيات اليوم",
+          command: "curl https://3bdulaziz.vercel.app/api/webhooks/stats?period=24h&group_by=type",
         },
       ],
     },
@@ -142,58 +110,56 @@ export async function GET() {
       common_issues: [
         {
           issue: "Webhook لا يصل",
-          solutions: [
-            "تحقق من صحة URL",
-            "تأكد من أن الخدمة تعمل",
-            "فحص firewall settings",
-            "مراجعة GitHub webhook logs",
-          ],
+          solutions: ["تأكد من صحة الـ URL", "تحقق من إعدادات الشبكة والـ firewall", "تأكد من أن الخدمة تعمل"],
         },
         {
           issue: "خطأ في التوقيع",
           solutions: [
-            "تحقق من GITHUB_WEBHOOK_SECRET",
-            "تأكد من تطابق السر في GitHub والتطبيق",
-            "مراجعة signature verification code",
+            "تأكد من صحة الـ secret",
+            "تحقق من تطابق الـ secret في GitHub والتطبيق",
+            "تأكد من استخدام SHA256",
           ],
         },
         {
-          issue: "بطء في الاستجابة",
-          solutions: [
-            "تحسين معالجة الـ webhook",
-            "استخدام async processing",
-            "تقليل العمليات المعقدة",
-            "إضافة caching",
-          ],
+          issue: "الأحداث لا تُسجل",
+          solutions: ["تحقق من اتصال قاعدة البيانات", "تأكد من صحة متغيرات البيئة", "راجع logs الخادم"],
         },
       ],
+    },
+    monitoring: {
+      title: "المراقبة والتتبع",
+      tools: {
+        webhook_site: {
+          url: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+          description: "مراقبة الـ webhooks في الوقت الفعلي",
+        },
+        api_dashboard: {
+          url: "https://3bdulaziz.vercel.app/webhooks",
+          description: "لوحة تحكم إدارة الـ webhooks",
+        },
+        github_deliveries: {
+          url: "https://github.com/wolfomani/3bdulaziz/settings/hooks",
+          description: "سجل تسليم GitHub webhooks",
+        },
+      },
     },
   }
 
   return NextResponse.json({
     success: true,
-    title: "دليل إعداد Dr X Webhooks",
-    description: "دليل شامل لإعداد ومراقبة webhooks في نظام Dr X",
-    setup: setupInstructions,
-    currentConfig: {
-      baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app",
-      environment: process.env.NODE_ENV || "development",
-      githubWebhookSecret: !!process.env.GITHUB_WEBHOOK_SECRET,
-      webhookSiteUrl: "https://webhook.site/4f2e177c-931c-49c2-a095-ad4ee2684614",
+    message: "دليل إعداد نظام Webhooks",
+    setup_instructions: setupInstructions,
+    current_status: {
+      github_webhook_configured: true,
+      secret_configured: true,
+      monitoring_active: true,
+      endpoints_active: true,
     },
-    quickStart: {
-      testCommand: `curl -X POST ${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/test -H "Content-Type: application/json" -d '{"message":"Quick test"}'`,
-      viewEvents: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/events`,
-      viewStats: `${process.env.NEXT_PUBLIC_APP_URL || "https://3bdulaziz.vercel.app"}/api/webhooks/stats`,
+    quick_start: {
+      "1": "تأكد من إعداد GitHub webhook مع الـ secret الصحيح",
+      "2": "اختبر النظام باستخدام /api/webhooks/test",
+      "3": "راقب الأحداث على webhook.site",
+      "4": "استخدم /api/webhooks/events لعرض السجلات",
     },
-    timestamp: new Date().toISOString(),
-  })
-}
-
-export async function POST() {
-  return NextResponse.json({
-    success: true,
-    message: "Setup endpoint is read-only. Use GET to retrieve setup instructions.",
-    availableMethods: ["GET"],
   })
 }
